@@ -1,0 +1,2146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>가맹점 세무 자동계산 v3 — 국수집 사장님</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="window._xlsxFailed=true"></script>
+<style>
+/* 폰트: 인터넷 연결 시 Noto Sans KR 로드, 없으면 시스템 한글 폰트 사용 */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  --bg:#0d0f14; --surface:#161920; --surface2:#1e222d; --border:#2a2f3d;
+  --accent:#00e5a0; --accent2:#ff6b35; --accent3:#4da6ff;
+  --text:#e8ecf4; --muted:#6b7694; --danger:#ff4d6d;
+  --warning:#ffb347; --radius:12px;
+  --mono:'JetBrains Mono','Courier New',monospace; --sans:'Noto Sans KR','Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','나눔고딕',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,229,160,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,160,0.03) 1px,transparent 1px);
+  background-size:40px 40px;pointer-events:none;z-index:0;}
+.container{max-width:1100px;margin:0 auto;padding:0 20px 60px;position:relative;z-index:1;}
+
+/* 헤더 */
+header{padding:40px 0 28px;border-bottom:1px solid var(--border);margin-bottom:32px;}
+.header-badge{display:inline-block;background:rgba(0,229,160,0.12);color:var(--accent);border:1px solid rgba(0,229,160,0.3);border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;}
+header h1{font-size:26px;font-weight:900;letter-spacing:-0.5px;line-height:1.2;margin-bottom:6px;}
+header h1 span{color:var(--accent);}
+header p{color:var(--muted);font-size:13px;}
+
+/* 탭 */
+.tabs{display:flex;gap:4px;margin-bottom:24px;background:var(--surface);padding:5px;border-radius:var(--radius);border:1px solid var(--border);overflow-x:auto;}
+.tab{flex:1;min-width:fit-content;padding:9px 14px;border:none;background:none;color:var(--muted);font-family:var(--sans);font-size:12px;font-weight:500;border-radius:8px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.tab.active{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.tab:hover:not(.active){color:var(--text);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* 카드 */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:18px;}
+.card-title{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.card-title::before{content:'';display:block;width:3px;height:14px;background:var(--accent);border-radius:2px;}
+
+/* 입력 */
+.input-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+.input-group label{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;}
+.input-group input,.input-group select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:13px;padding:9px 13px;outline:none;transition:border-color .2s;}
+.input-group input:focus,.input-group select:focus{border-color:var(--accent);}
+.input-group select option{background:var(--surface2);}
+.input-suffix{position:relative;}
+.input-suffix input{padding-right:36px;}
+.input-suffix span{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:11px;pointer-events:none;}
+
+/* 업로드 존 */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:32px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px;}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(0,229,160,0.04);}
+.upload-zone .upload-icon{font-size:32px;margin-bottom:10px;}
+.upload-zone .upload-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;}
+.upload-zone .upload-sub{font-size:12px;color:var(--muted);}
+.upload-zone input[type=file]{display:none;}
+
+/* 결과 그리드 */
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
+.result-box{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+.result-box.green{border-color:rgba(0,229,160,.35);background:rgba(0,229,160,.05);}
+.result-box.red{border-color:rgba(255,77,109,.35);background:rgba(255,77,109,.05);}
+.result-label{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.result-amount{font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;margin-bottom:5px;}
+.result-amount.green{color:var(--accent);}
+.result-amount.red{color:var(--danger);}
+.result-amount.orange{color:var(--accent2);}
+.result-sub{font-size:11px;color:var(--muted);}
+
+/* 세금 카드 3분할 */
+.tax-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
+.tax-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center;}
+.tax-item-label{font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600;}
+.tax-item-amount{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--accent2);}
+.tax-item-sub{font-size:10px;color:var(--muted);margin-top:5px;}
+
+/* 의제매입 상세 */
+.deduction-box{background:rgba(77,166,255,.07);border:1px solid rgba(77,166,255,.25);border-radius:var(--radius);padding:18px;margin-bottom:18px;}
+.deduction-box .d-title{font-size:12px;font-weight:700;color:var(--accent3);margin-bottom:12px;letter-spacing:.5px;}
+.deduction-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(77,166,255,.12);font-size:13px;}
+.deduction-row:last-child{border-bottom:none;}
+.deduction-row .dl{color:var(--muted);}
+.deduction-row .dv{font-family:var(--mono);color:var(--accent3);font-weight:600;}
+
+/* 요약 행 */
+.summary-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(42,47,61,.6);font-size:13px;}
+.summary-row:last-child{border-bottom:none;}
+.summary-row .label{color:var(--muted);}
+.summary-row .value{font-family:var(--mono);font-weight:600;}
+
+/* 테이블 */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+th{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:10px 12px;border-bottom:1px solid rgba(42,47,61,.5);font-size:12px;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,.02);}
+
+/* 태그 */
+.tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.3px;padding:2px 7px;border-radius:4px;white-space:nowrap;}
+.tag-매출{background:rgba(0,229,160,.15);color:var(--accent);}
+.tag-매입{background:rgba(77,166,255,.15);color:var(--accent3);}
+.tag-카드{background:rgba(255,107,53,.15);color:var(--accent2);}
+.tag-현금영수증{background:rgba(107,118,148,.15);color:var(--muted);}
+.tag-세금계산서{background:rgba(255,179,71,.15);color:var(--warning);}
+.tag-현금{background:rgba(80,80,90,.3);color:#888;}
+.tag-적격{background:rgba(0,229,160,.12);color:var(--accent);}
+.tag-비적격{background:rgba(255,77,109,.12);color:var(--danger);}
+.tag-면세{background:rgba(255,179,71,.12);color:var(--warning);}
+.tag-과세{background:rgba(77,166,255,.12);color:var(--accent3);}
+
+.amt-plus{color:var(--accent);font-family:var(--mono);font-weight:600;}
+.amt-minus{color:var(--accent3);font-family:var(--mono);font-weight:600;}
+
+/* 버튼 */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;border:none;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;}
+.btn-primary{background:var(--accent);color:#0d0f14;}
+.btn-primary:hover{background:#00c989;transform:translateY(-1px);}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-sm{padding:5px 12px;font-size:11px;}
+.btn-del{background:none;color:var(--danger);border:none;padding:4px 8px;font-size:15px;cursor:pointer;border-radius:4px;}
+.btn-del:hover{background:rgba(255,77,109,.1);}
+
+/* 절감 박스 */
+.saving-box{background:linear-gradient(135deg,rgba(0,229,160,.08),rgba(0,229,160,.03));border:1px solid rgba(0,229,160,.25);border-radius:var(--radius);padding:22px;text-align:center;margin-bottom:18px;}
+.saving-label{font-size:11px;color:var(--accent);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
+.saving-amount{font-family:var(--mono);font-size:36px;font-weight:700;color:var(--accent);line-height:1;margin-bottom:5px;}
+.saving-sub{font-size:12px;color:var(--muted);}
+
+/* 바 차트 */
+.bar-wrap{margin-bottom:14px;}
+.bar-label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px;}
+.bar-track{height:10px;background:var(--border);border-radius:5px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:5px;transition:width .6s cubic-bezier(.4,0,.2,1);}
+.bar-van{background:var(--accent);}
+.bar-pg{background:var(--danger);}
+
+/* 신고서 카드 */
+.report-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px;}
+.report-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.report-card-title{font-size:15px;font-weight:700;color:var(--text);}
+.report-card-date{font-size:11px;color:var(--muted);margin-top:3px;}
+.report-badge{font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;}
+.badge-vat{background:rgba(0,229,160,.15);color:var(--accent);}
+.badge-income{background:rgba(255,107,53,.15);color:var(--accent2);}
+.badge-local{background:rgba(77,166,255,.15);color:var(--accent3);}
+.report-rows{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.report-row{display:flex;flex-direction:column;gap:2px;}
+.report-row .rl{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+.report-row .rv{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);}
+.report-total{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.report-total-label{font-size:12px;color:var(--muted);}
+.report-total-amount{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent2);}
+
+/* 엔트리 행 */
+.entry-row{display:grid;grid-template-columns:110px 1fr 90px 110px 100px 36px;gap:6px;align-items:center;margin-bottom:6px;}
+.entry-row input,.entry-row select{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--sans);font-size:12px;padding:7px 9px;outline:none;width:100%;}
+.entry-row input:focus,.entry-row select:focus{border-color:var(--accent);}
+
+.info-note{background:rgba(77,166,255,.07);border:1px solid rgba(77,166,255,.2);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--accent3);margin-bottom:14px;line-height:1.7;}
+.warn-note{background:rgba(255,179,71,.07);border:1px solid rgba(255,179,71,.2);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--warning);margin-bottom:14px;line-height:1.7;}
+.divider{height:1px;background:var(--border);margin:18px 0;}
+.flex-gap{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+
+/* 입력 힌트 & 툴팁 */
+.field-hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;}
+.field-help{font-size:12px;color:var(--accent3);margin-bottom:14px;padding:8px 12px;background:rgba(77,166,255,.06);border-radius:6px;border-left:3px solid var(--accent3);}
+.tooltip-btn{background:rgba(107,118,148,.25);color:var(--muted);border:none;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;cursor:pointer;vertical-align:middle;margin-left:5px;line-height:16px;padding:0;transition:all .2s;}
+.tooltip-btn:hover{background:var(--accent);color:#0d0f14;}
+.tooltip-box{display:none;background:var(--surface);border:1px solid rgba(0,229,160,.3);border-radius:8px;padding:14px;font-size:12px;color:var(--text);line-height:1.7;margin-top:8px;}
+.tooltip-box.open{display:block;}
+
+/* 매출/매입 미니 요약 */
+.sales-summary,.cost-summary{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.summary-chip{flex:1;min-width:100px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;}
+.summary-chip .sc-label{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;}
+.summary-chip .sc-val{font-family:var(--mono);font-size:14px;font-weight:600;}
+.summary-chip .sc-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.sc-green{color:var(--accent);}
+.sc-blue{color:var(--accent3);}
+.sc-orange{color:var(--accent2);}
+.sc-muted{color:var(--muted);}
+.sc-warn{color:var(--warning);}
+
+/* 금액 불일치 경고 */
+.amount-warn{display:none;background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.3);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--warning);margin-top:10px;}
+
+/* 데이터 소스 배너 */
+.source-banner{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:8px;font-size:12px;flex-wrap:wrap;}
+.source-banner.src-basic{background:rgba(107,118,148,.12);border:1px solid rgba(107,118,148,.3);}
+.source-banner.src-ledger{background:rgba(77,166,255,.08);border:1px solid rgba(77,166,255,.3);}
+.source-banner.src-file{background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.3);}
+.source-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.src-basic .source-dot{background:var(--muted);}
+.src-ledger .source-dot{background:var(--accent3);}
+.src-file .source-dot{background:var(--accent);}
+.source-banner .src-label{font-weight:700;}
+.src-banner-text{display:flex;flex-direction:column;gap:2px;flex:1;}
+.source-banner .src-detail{color:var(--muted);font-size:11px;}
+
+/* 손익분기점 */
+.bep-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.bep-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;}
+.bep-box.bep-highlight{background:rgba(0,229,160,.07);border-color:rgba(0,229,160,.35);}
+.bep-box.bep-danger{background:rgba(255,77,109,.06);border-color:rgba(255,77,109,.3);}
+.bep-label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px;}
+.bep-value{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1;}
+.bep-value.green{color:var(--accent);}
+.bep-value.red{color:var(--danger);}
+.bep-value.orange{color:var(--accent2);}
+.bep-sub{font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5;}
+@media(max-width:640px){.bep-grid{grid-template-columns:1fr;}}
+
+/* 현재 사항 적용 버튼 */
+.apply-tax-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding:12px 16px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);flex-wrap:wrap;}
+.apply-tax-info{font-size:12px;color:var(--muted);flex:1;line-height:1.5;}
+.btn-apply-tax{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:8px;border:1px solid rgba(0,229,160,.4);background:rgba(0,229,160,.08);color:var(--accent);font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-apply-tax:hover{background:rgba(0,229,160,.18);border-color:var(--accent);transform:translateY(-1px);}
+.bat-icon{font-size:15px;display:inline-block;transition:transform .35s;}
+.btn-apply-tax:hover .bat-icon{transform:rotate(180deg);}
+
+/* 세금 반영 상태 배너 */
+.cmp-tax-status{margin-bottom:14px;padding:10px 14px;border-radius:8px;font-size:12px;display:none;}
+.cmp-tax-status.has-tax{display:flex;align-items:center;gap:8px;background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.2);color:var(--accent);}
+.cmp-tax-status.no-tax{display:flex;align-items:center;gap:8px;background:rgba(255,179,71,.07);border:1px solid rgba(255,179,71,.2);color:var(--warning);}
+.cts-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.has-tax .cts-dot{background:var(--accent);}
+.no-tax .cts-dot{background:var(--warning);}
+.src-basic .src-label{color:var(--muted);}
+.src-ledger .src-label{color:var(--accent3);}
+.src-file .src-label{color:var(--accent);}
+.source-banner .src-detail{color:var(--muted);}
+.source-chips{display:flex;gap:6px;margin-left:auto;}
+.source-chip{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;}
+.source-chip.active-chip{background:rgba(0,229,160,.15);color:var(--accent);border-color:rgba(0,229,160,.4);}
+.source-chip.inactive-chip{background:rgba(107,118,148,.1);color:var(--muted);}
+.source-chip:hover{opacity:.8;}
+
+/* 업로드 결과 뱃지 */
+.upload-result{background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--accent);margin-bottom:12px;display:none;}
+
+/* 산출 근거 */
+.basis-section{margin-bottom:4px;}
+.basis-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.basis-icon{font-size:16px;}
+.basis-title{font-size:13px;font-weight:700;color:var(--text);flex:1;}
+.basis-amount{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--accent2);}
+.basis-body{display:flex;flex-direction:column;gap:0;}
+.basis-row{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-radius:6px;font-size:12px;}
+.basis-row:nth-child(odd){background:rgba(255,255,255,.02);}
+.basis-row .br-label{color:var(--muted);}
+.basis-row .br-val{font-family:var(--mono);color:var(--text);font-weight:500;}
+.basis-row.br-indent .br-label{padding-left:16px;color:var(--muted);}
+.basis-row.br-indent .br-label::before{content:"↳ ";opacity:.5;}
+.basis-row.br-op{background:rgba(77,166,255,.05);}
+.basis-row.br-op .br-label{color:var(--accent3);font-weight:600;}
+.basis-row.br-op .br-val{color:var(--accent3);}
+.basis-row.br-result{background:rgba(255,107,53,.06);border-radius:6px;margin-top:4px;}
+.basis-row.br-result .br-label{color:var(--accent2);font-weight:700;}
+.basis-row.br-result .br-val{color:var(--accent2);font-size:14px;font-weight:700;}
+.basis-row.br-deduct{background:rgba(0,229,160,.05);}
+.basis-row.br-deduct .br-label{color:var(--accent);}
+.basis-row.br-deduct .br-val{color:var(--accent);}
+.basis-final{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:18px;}
+.basis-final-title{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:14px;}
+.basis-final-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(42,47,61,.5);font-size:13px;}
+.basis-final-row:last-child{border-bottom:none;padding-top:12px;margin-top:4px;}
+.basis-final-row .bfl{color:var(--muted);}
+.basis-final-row .bfv{font-family:var(--mono);font-weight:600;}
+.basis-final-row.total-row .bfl{color:var(--text);font-weight:700;font-size:14px;}
+.basis-final-row.total-row .bfv{color:var(--accent2);font-size:18px;}
+
+/* 월별 입력 테이블 */
+.monthly-table{width:100%;border-collapse:collapse;min-width:700px;}
+.monthly-table th{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);background:var(--surface2);white-space:nowrap;}
+.th-hint{display:block;font-size:9px;font-weight:400;letter-spacing:0;color:var(--muted);opacity:.7;margin-top:2px;text-transform:none;}
+.monthly-table td{padding:0;border-bottom:1px solid rgba(42,47,61,.4);vertical-align:middle;}
+.monthly-table tr:hover td{background:rgba(255,255,255,.015);}
+.monthly-table tr.has-data td{background:rgba(0,229,160,.025);}
+.month-label{display:flex;align-items:center;justify-content:center;padding:8px 4px;font-size:13px;font-weight:700;color:var(--muted);min-height:46px;}
+.month-label.has-data{color:var(--accent);}
+.m-input{width:100%;background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:12px;padding:12px 10px;outline:none;text-align:right;}
+.m-input:focus{background:rgba(0,229,160,.06);}
+.m-input::placeholder{color:rgba(107,118,148,.4);}
+.m-input.has-val{color:var(--text);}
+.m-somt{padding:10px 12px;font-family:var(--mono);font-size:12px;text-align:right;color:var(--muted);}
+.m-somt.active{color:var(--accent2);font-weight:600;}
+.monthly-table tfoot td{padding:10px 12px;font-size:12px;font-weight:700;border-top:2px solid var(--border);background:var(--surface2);}
+.monthly-annual-summary{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 4px;}
+.annual-chip{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.annual-chip .ac-label{font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;}
+.annual-chip .ac-val{font-family:var(--mono);font-size:16px;font-weight:700;}
+.annual-chip .ac-sub{font-size:10px;color:var(--muted);margin-top:4px;}
+.ac-green{color:var(--accent);}
+.ac-blue{color:var(--accent3);}
+.ac-orange{color:var(--accent2);}
+.ac-muted{color:var(--muted);}
+.month-progress{display:flex;gap:3px;margin-top:8px;}
+.mp-dot{width:14px;height:6px;border-radius:3px;background:var(--border);}
+.mp-dot.filled{background:var(--accent);}
+/* 아코디언 카드 헤더 */
+.acc-card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:20px 22px 14px;flex-wrap:wrap;}
+.acc-card-hint{font-size:11px;color:var(--muted);margin-top:3px;}
+.acc-card-actions{display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0;}
+
+/* 면세재료 안내 배너 */
+.exempt-info-banner{display:flex;align-items:flex-start;gap:14px;margin:0 16px 14px;padding:14px 16px;background:rgba(0,229,160,.05);border:1px solid rgba(0,229,160,.18);border-radius:10px;}
+.eib-icon{font-size:22px;flex-shrink:0;margin-top:1px;}
+.eib-body{flex:1;}
+.eib-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px;letter-spacing:.3px;}
+.eib-desc{font-size:12px;color:var(--text);line-height:1.7;opacity:.85;}
+.eib-tag{display:inline-block;margin-top:7px;font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:rgba(0,229,160,.15);color:var(--accent);letter-spacing:.3px;}
+
+/* 아코디언 */
+.acc-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;transition:border-color .2s;}
+.acc-item.open{border-color:rgba(0,229,160,.4);}
+.acc-item.has-data:not(.open){border-color:rgba(0,229,160,.2);}
+.acc-header{display:flex;align-items:center;padding:13px 18px;cursor:pointer;user-select:none;gap:12px;transition:background .15s;}
+.acc-header:hover{background:rgba(255,255,255,.02);}
+.acc-month{font-size:14px;font-weight:700;color:var(--muted);min-width:38px;}
+.acc-item.open .acc-month,.acc-item.has-data .acc-month{color:var(--accent);}
+.acc-chips{display:flex;gap:6px;flex:1;flex-wrap:wrap;align-items:center;}
+.acc-chip{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:500;}
+.acc-chip-sales{background:rgba(0,229,160,.12);color:var(--accent);}
+.acc-chip-cost{background:rgba(77,166,255,.12);color:var(--accent3);}
+.acc-chip-profit{background:rgba(255,107,53,.12);color:var(--accent2);}
+.acc-chip-empty{background:rgba(107,118,148,.1);color:var(--muted);font-style:italic;}
+.acc-arrow{font-size:11px;color:var(--muted);transition:transform .25s;margin-left:4px;}
+.acc-item.open .acc-arrow{transform:rotate(180deg);}
+.acc-body{display:none;padding:0 18px 18px;animation:accFade .15s ease;}
+.acc-item.open .acc-body{display:block;}
+@keyframes accFade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.acc-field{display:flex;flex-direction:column;gap:5px;}
+.acc-field label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;}
+.acc-field .hint{font-size:10px;color:var(--muted);opacity:.7;line-height:1.4;}
+.acc-input-wrap{position:relative;}
+.acc-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:14px;padding:10px 36px 10px 12px;outline:none;transition:border-color .2s;text-align:right;}
+.acc-input:focus{border-color:var(--accent);}
+.acc-unit{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none;}
+.acc-divider{grid-column:1/-1;height:1px;background:var(--border);margin:4px 0;}
+.acc-summary{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-radius:8px;padding:10px 14px;font-size:12px;margin-top:4px;}
+.acc-summary .asl{color:var(--muted);}
+.acc-summary .asv{font-family:var(--mono);font-weight:700;color:var(--accent2);}
+.acc-warn{grid-column:1/-1;font-size:11px;color:var(--warning);padding:3px 2px;display:none;}
+.cmp-full-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px;}
+.cmp-col{border-radius:10px;padding:18px;}
+.cmp-col.van-col{background:rgba(0,229,160,.05);border:1px solid rgba(0,229,160,.25);}
+.cmp-col.pg-col{background:rgba(255,77,109,.05);border:1px solid rgba(255,77,109,.25);}
+.cmp-col-title{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:14px;}
+.van-col .cmp-col-title{color:var(--accent);}
+.pg-col .cmp-col-title{color:var(--danger);}
+.cmp-col-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;}
+.cmp-col-row:last-child{border-bottom:none;padding-top:10px;margin-top:4px;}
+.cmp-col-row .cr-l{color:var(--muted);}
+.cmp-col-row .cr-v{font-family:var(--mono);font-weight:600;color:var(--text);}
+.cmp-col-row.cr-total .cr-l{font-weight:700;color:var(--text);}
+.van-col .cmp-col-row.cr-total .cr-v{color:var(--accent);font-size:15px;}
+.pg-col .cmp-col-row.cr-total .cr-v{color:var(--danger);font-size:15px;}
+  .result-grid,.tax-grid{grid-template-columns:1fr;}
+  .entry-row{grid-template-columns:1fr 1fr 1fr;}
+  header h1{font-size:20px;}
+  .tabs{font-size:11px;}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="header-badge">Demo v3.0 · 국수집 세무 자동계산</div>
+  <h1>가맹점 사장님을 위한<br><span>세무 자동계산 + VAN vs PG 비교</span></h1>
+  <p>입력하는 순간 자동 계산 · 데이터 소스 자동 우선순위 · CSV·엑셀 업로드 · 신고 요약서</p>
+  <!-- 데이터 소스 상태 배너 -->
+  <div id="data-source-banner" style="margin-top:14px;"></div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab(0)">① 기본 정보</button>
+  <button class="tab" onclick="switchTab(1)">② 거래내역</button>
+  <button class="tab" onclick="switchTab(2)">③ 파일 업로드</button>
+  <button class="tab" onclick="switchTab(3)">④ 세금 계산</button>
+  <button class="tab" onclick="switchTab(4)">⑤ 신고 요약서</button>
+  <button class="tab" onclick="switchTab(5)">⑥ VAN vs PG</button>
+</div>
+
+<!-- ① 기본 정보 -->
+<div class="tab-content active">
+  <div class="card">
+    <div class="card-title">사업자 정보</div>
+    <div class="input-grid">
+      <div class="input-group">
+        <label>상호명</label>
+        <input type="text" id="biz-name" value="맛있는 국수집">
+      </div>
+      <div class="input-group">
+        <label>과세 유형</label>
+        <select id="tax-type" onchange="updateAll()">
+          <option value="general">일반과세자</option>
+          <option value="simple" selected>간이과세자</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>계산 기준 연도</label>
+        <select id="calc-year" onchange="updateAll()">
+          <option value="2025" selected>2025년</option>
+          <option value="2024">2024년</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>직원 수</label>
+        <select id="emp-count" onchange="updateAll()">
+          <option value="0" selected>없음 (1인)</option>
+          <option value="1">1명</option>
+          <option value="2">2명</option>
+          <option value="3">3명+</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 월 고정비 -->
+  <div class="card">
+    <div class="card-title">월 고정비 <span style="font-size:11px;font-weight:400;color:var(--muted);letter-spacing:0;text-transform:none;">매달 동일하게 적용됩니다</span></div>
+    <div class="input-grid">
+      <div class="input-group">
+        <label>월 임차료</label>
+        <div class="input-suffix">
+          <input type="text" id="monthly-rent" value="800,000"
+            onfocus="onFocusFmt(this)" onblur="onBlurFmt(this,'monthly-rent-raw')" oninput="updateAll()">
+          <input type="hidden" id="monthly-rent-raw" value="800000">
+          <span>원</span>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>월 인건비</label>
+        <div class="input-suffix">
+          <input type="text" id="monthly-labor" value="0"
+            onfocus="onFocusFmt(this)" onblur="onBlurFmt(this,'monthly-labor-raw')" oninput="updateAll()">
+          <input type="hidden" id="monthly-labor-raw" value="0">
+          <span>원</span>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>기타 경비 (월)</label>
+        <div class="input-suffix">
+          <input type="text" id="monthly-etc" value="300,000"
+            onfocus="onFocusFmt(this)" onblur="onBlurFmt(this,'monthly-etc-raw')" oninput="updateAll()">
+          <input type="hidden" id="monthly-etc-raw" value="300000">
+          <span>원</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 연간 요약 칩 -->
+  <div class="monthly-annual-summary" id="monthly-annual-summary"></div>
+
+  <!-- 월별 매출·매입 카드 (아코디언 포함) -->
+  <div class="card" style="padding:0;overflow:visible;">
+
+    <!-- 카드 헤더 -->
+    <div class="acc-card-header">
+      <div>
+        <div class="card-title" style="margin-bottom:2px;">월별 매출 · 매입 입력</div>
+        <div class="acc-card-hint">월을 클릭하면 입력 항목이 펼쳐집니다 · 미입력 월은 0원 처리</div>
+      </div>
+      <div class="acc-card-actions">
+        <button class="btn btn-ghost btn-sm" onclick="copyPrevToEmpty()">빈 달 채우기</button>
+        <button class="btn btn-ghost btn-sm" onclick="expandAllMonths()">전체 펼치기</button>
+        <button class="btn btn-ghost btn-sm" onclick="collapseAllMonths()">전체 접기</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearAllMonths()">초기화</button>
+      </div>
+    </div>
+
+    <!-- 면세재료 안내 배너 -->
+    <div class="exempt-info-banner">
+      <div class="eib-icon">🥬</div>
+      <div class="eib-body">
+        <div class="eib-title">면세 재료 입력 안내</div>
+        <div class="eib-desc">채소·고기·생선·달걀처럼 <strong>영수증에 부가세가 없는 재료</strong>가 면세재료입니다.
+        국수집 기준 재료비의 약 <strong>60~75%</strong>가 면세입니다.
+        비워두면 재료비의 <strong>70%</strong>로 자동 계산합니다.</div>
+        <div class="eib-tag">일반과세자만 의제매입세액공제 적용</div>
+      </div>
+    </div>
+
+    <!-- 아코디언 목록 -->
+    <div id="accordion-list" style="padding:0 16px 16px;"></div>
+
+  </div>
+
+  <div class="flex-gap" style="margin-top:4px;">
+    <button class="btn btn-primary" onclick="switchTab(3)">④ 세금 계산 →</button>
+    <button class="btn btn-ghost" onclick="switchTab(2)">③ 파일 업로드 →</button>
+  </div>
+
+  <!-- 숨겨진 호환성 필드 -->
+  <input type="hidden" id="monthly-sales" value="0">
+  <input type="hidden" id="monthly-cost" value="0">
+  <input type="hidden" id="card-amount" value="0">
+  <input type="hidden" id="cash-receipt-amount" value="0">
+  <input type="hidden" id="exempt-amount" value="0">
+</div>
+
+<!-- ② 거래내역 수동 입력 -->
+<div class="tab-content">
+  <div class="card">
+    <div class="card-title">거래내역 직접 입력</div>
+    <div class="info-note">적격증빙(카드·현금영수증·세금계산서)은 부가세 공제에 자동 반영됩니다. 면세 재료는 의제매입세액공제 계산에 사용됩니다.</div>
+    <div style="display:grid;grid-template-columns:110px 1fr 90px 110px 100px 36px;gap:6px;margin-bottom:8px;">
+      <div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;">날짜</div>
+      <div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;">내용</div>
+      <div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;">구분</div>
+      <div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;">결제수단</div>
+      <div style="font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;">금액(원)</div>
+      <div></div>
+    </div>
+    <div id="ledger-rows"></div>
+    <div class="flex-gap">
+      <button class="btn btn-ghost btn-sm" onclick="addRow('income')">+ 매출 추가</button>
+      <button class="btn btn-ghost btn-sm" onclick="addRow('expense')">+ 매입/경비 추가</button>
+      <button class="btn btn-primary btn-sm" onclick="applyLedger()">적용 후 계산 →</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">입력된 거래 목록</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>날짜</th><th>내용</th><th>구분</th><th>결제수단</th><th>증빙</th><th style="text-align:right">금액</th></tr></thead>
+        <tbody id="ledger-tbody"><tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px;">거래내역 없음</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ③ 파일 업로드 -->
+<div class="tab-content">
+
+  <!-- 현금영수증 CSV -->
+  <div class="card">
+    <div class="card-title">홈택스 현금영수증 CSV 업로드</div>
+    <div class="info-note">
+      홈택스 → 조회/발급 → 현금영수증 → 매출/매입 내역 조회 → 엑셀/CSV 다운로드 후 업로드하세요.<br>
+      컬럼: <strong>거래일자, 가맹점명(또는 거래처), 승인금액, 공급가액, 부가세</strong> 순서를 자동 인식합니다.
+    </div>
+    <div class="upload-zone" id="csv-zone" onclick="document.getElementById('csv-file').click()" ondragover="onDrag(event,'csv-zone')" ondragleave="offDrag('csv-zone')" ondrop="onDrop(event,'csv')">
+      <input type="file" id="csv-file" accept=".csv,.txt" onchange="handleCSV(event)">
+      <div class="upload-icon">📄</div>
+      <div class="upload-title">CSV 파일을 클릭 또는 드래그</div>
+      <div class="upload-sub">홈택스 현금영수증 내역 (.csv, .txt)</div>
+    </div>
+    <div class="upload-result" id="csv-result"></div>
+    <button class="btn btn-ghost btn-sm" onclick="loadSampleCSV()">샘플 데이터로 테스트</button>
+  </div>
+
+  <!-- 카드사 엑셀 -->
+  <div class="card">
+    <div class="card-title">카드사 거래내역 엑셀 업로드 (매출 / 매입)</div>
+    <div class="info-note">
+      카드사 홈페이지 또는 VAN 단말기 정산 내역을 엑셀로 다운로드 후 업로드하세요.<br>
+      컬럼: <strong>거래일자, 가맹점/거래처, 거래금액, 구분(매출/매입)</strong> — 컬럼 순서가 달라도 자동 매핑합니다.
+    </div>
+    <div class="upload-zone" id="xlsx-zone" onclick="document.getElementById('xlsx-file').click()" ondragover="onDrag(event,'xlsx-zone')" ondragleave="offDrag('xlsx-zone')" ondrop="onDrop(event,'xlsx')">
+      <input type="file" id="xlsx-file" accept=".xlsx,.xls,.csv" onchange="handleXLSX(event)">
+      <div class="upload-icon">📊</div>
+      <div class="upload-title">엑셀 파일을 클릭 또는 드래그</div>
+      <div class="upload-sub">카드사 거래내역 (.xlsx, .xls, .csv)</div>
+    </div>
+    <div class="upload-result" id="xlsx-result"></div>
+    <button class="btn btn-ghost btn-sm" onclick="loadSampleXLSX()">샘플 데이터로 테스트</button>
+  </div>
+
+  <!-- 업로드된 거래 통합 목록 -->
+  <div class="card">
+    <div class="card-title">업로드된 거래 통합 목록 <span id="upload-count" style="color:var(--accent);font-family:var(--mono);font-size:12px;margin-left:8px;"></span></div>
+    <div class="flex-gap" style="margin-bottom:14px;">
+      <button class="btn btn-ghost btn-sm" onclick="clearUploaded()">전체 초기화</button>
+      <button class="btn btn-primary btn-sm" onclick="applyUploaded()">이 데이터로 세금 계산 →</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>날짜</th><th>내용</th><th>출처</th><th>구분</th><th>결제수단</th><th>증빙</th><th style="text-align:right">금액</th></tr></thead>
+        <tbody id="upload-tbody"><tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px;">업로드된 데이터 없음</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ④ 세금 계산 -->
+<div class="tab-content">
+  <div class="card">
+    <div class="card-title">매출 / 매입 현황</div>
+    <div class="result-grid">
+      <div class="result-box green">
+        <div class="result-label">연간 총 매출</div>
+        <div class="result-amount green" id="annual-sales">—</div>
+        <div class="result-sub" id="sales-sub">기본정보 기준</div>
+      </div>
+      <div class="result-box">
+        <div class="result-label">연간 총 매입·경비</div>
+        <div class="result-amount" id="annual-cost">—</div>
+        <div class="result-sub">재료비+임차료+인건비+기타</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 의제매입세액공제 상세 -->
+  <div class="deduction-box" id="deduction-section">
+    <div class="d-title">🥬 의제매입세액공제 상세 (음식점 — 일반과세자 해당)</div>
+    <div class="deduction-row"><span class="dl">면세 재료 매입액 (연)</span><span class="dv" id="d-exempt-purchase">—</span></div>
+    <div class="deduction-row"><span class="dl">공제율</span><span class="dv" id="d-rate">8/108 (2025년 적용)</span></div>
+    <div class="deduction-row"><span class="dl">공제 가능액 (한도 전)</span><span class="dv" id="d-before-limit">—</span></div>
+    <div class="deduction-row"><span class="dl">한도율 (매출 기준)</span><span class="dv" id="d-limit-rate">—</span></div>
+    <div class="deduction-row"><span class="dl">한도액</span><span class="dv" id="d-limit-amount">—</span></div>
+    <div class="deduction-row" style="border-top:1px solid rgba(77,166,255,.3);margin-top:4px;padding-top:10px;">
+      <span class="dl" style="font-weight:700;color:var(--text);">최종 공제액</span>
+      <span class="dv" style="font-size:16px;" id="d-final">—</span>
+    </div>
+    <div class="deduction-row"><span class="dl" style="font-size:11px;">※ 2026년 변경 예정</span><span class="dv" style="font-size:11px;color:var(--warning);" id="d-2026">개인 2억↓: 50%, 2억↑: 40%로 축소</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">세금 자동계산 결과</div>
+    <div class="tax-grid">
+      <div class="tax-item">
+        <div class="tax-item-label">부가가치세 (연)</div>
+        <div class="tax-item-amount" id="vat-result">—</div>
+        <div class="tax-item-sub" id="vat-sub">—</div>
+      </div>
+      <div class="tax-item">
+        <div class="tax-item-label">종합소득세 (연)</div>
+        <div class="tax-item-amount" id="income-tax-result">—</div>
+        <div class="tax-item-sub" id="income-tax-sub">—</div>
+      </div>
+      <div class="tax-item">
+        <div class="tax-item-label">지방소득세 (연)</div>
+        <div class="tax-item-amount" id="local-tax-result">—</div>
+        <div class="tax-item-sub">종합소득세의 10%</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="summary-row"><span class="label">납부 세금 합계 (연간)</span><span class="value orange" id="total-tax">—</span></div>
+    <div class="summary-row"><span class="label">월평균 세금 부담</span><span class="value" id="monthly-tax">—</span></div>
+    <div class="summary-row"><span class="label">실질 세부담률 (매출 대비)</span><span class="value" id="tax-rate">—</span></div>
+    <div class="summary-row"><span class="label">순이익 (세후)</span><span class="value green" id="net-profit">—</span></div>
+  </div>
+
+  <!-- 산출 근거 상세 -->
+  <div class="card" id="calc-basis-card">
+    <div class="card-title">세금 산출 근거 상세</div>
+
+    <!-- 부가가치세 근거 -->
+    <div class="basis-section">
+      <div class="basis-header">
+        <span class="basis-icon">🧾</span>
+        <span class="basis-title">부가가치세 계산 과정</span>
+        <span class="basis-amount" id="basis-vat-total">—</span>
+      </div>
+      <div class="basis-body" id="basis-vat-body"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 종합소득세 근거 -->
+    <div class="basis-section">
+      <div class="basis-header">
+        <span class="basis-icon">📊</span>
+        <span class="basis-title">종합소득세 계산 과정</span>
+        <span class="basis-amount" id="basis-income-total">—</span>
+      </div>
+      <div class="basis-body" id="basis-income-body"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 지방소득세 근거 -->
+    <div class="basis-section">
+      <div class="basis-header">
+        <span class="basis-icon">🏛️</span>
+        <span class="basis-title">지방소득세</span>
+        <span class="basis-amount" id="basis-local-total">—</span>
+      </div>
+      <div class="basis-body" id="basis-local-body"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 최종 합산 -->
+    <div class="basis-final" id="basis-final"></div>
+  </div>
+</div>
+
+<!-- ⑤ 신고 요약서 -->
+<div class="tab-content">
+  <div class="card">
+    <div class="card-title">연간 세금 신고 일정 & 요약서</div>
+    <div class="warn-note">⚠️ 본 요약서는 참고용이며 실제 신고 시 세무사 확인이 필요합니다. 공제·감면 항목은 개인 상황에 따라 다를 수 있습니다.</div>
+  </div>
+  <div id="report-list"></div>
+</div>
+
+<!-- ⑥ VAN vs PG -->
+<div class="tab-content">
+  <div class="card">
+    <div class="card-title">수수료 조건 설정</div>
+
+    <!-- 세금 반영 상태 배너 -->
+    <div class="cmp-tax-status" id="cmp-tax-status"></div>
+
+    <div class="input-grid">
+      <div class="input-group">
+        <label>월 카드 매출</label>
+        <div class="input-suffix"><input type="number" id="cmp-sales" value="6000000" oninput="updateCompare()"><span>원</span></div>
+      </div>
+      <div class="input-group">
+        <label>VAN 수수료율</label>
+        <div class="input-suffix"><input type="number" id="van-rate" value="0.8" step="0.1" oninput="updateCompare()"><span>%</span></div>
+      </div>
+      <div class="input-group">
+        <label>PG 수수료율 (세무 포함)</label>
+        <div class="input-suffix"><input type="number" id="pg-rate" value="5.0" step="0.1" oninput="updateCompare()"><span>%</span></div>
+      </div>
+      <div class="input-group">
+        <label>세무사 기장료 (월)</label>
+        <div class="input-suffix"><input type="number" id="acct-fee" value="150000" oninput="updateCompare()"><span>원</span></div>
+      </div>
+    </div>
+
+    <!-- 현재 사항 적용 버튼 -->
+    <div class="apply-tax-row">
+      <div class="apply-tax-info" id="apply-tax-info">
+        ④ 세금 계산 탭의 결과를 반영합니다
+      </div>
+      <button class="btn-apply-tax" id="btn-apply-tax" onclick="applyCurrentTaxToCompare()">
+        <span class="bat-icon">⟳</span>
+        현재 세금 계산 적용
+      </button>
+    </div>
+  </div>
+
+  <!-- 손익분기점 계산기 -->
+  <div class="card">
+    <div class="card-title">손익분기점 계산기 — PG가 유리해지는 수수료율</div>
+    <div class="info-note" style="margin-bottom:14px;">
+      💡 VAN 수수료 + 세무사 비용 합계와 같아지는 PG 수수료율을 계산합니다.
+      <strong>이 수수료율 이하면 PG가 VAN보다 저렴합니다.</strong>
+    </div>
+    <div class="bep-grid" id="bep-grid">
+      <!-- JS 렌더링 -->
+    </div>
+  </div>
+
+  <div class="saving-box" id="saving-box-main">
+    <div class="saving-label" id="saving-main-label">PG 방식 선택 시 연간 절감액</div>
+    <div class="saving-amount" id="saving-amount">—</div>
+    <div class="saving-sub" id="saving-sub">VAN 대비 절감 금액</div>
+  </div>
+
+  <div class="result-grid">
+    <div class="result-box" id="van-result-box">
+      <div class="result-label" id="van-result-label">VAN + 세무사</div>
+      <div class="result-amount" id="van-total">—</div>
+      <div class="result-sub" id="van-break">월 비용</div>
+    </div>
+    <div class="result-box" id="pg-result-box">
+      <div class="result-label" id="pg-result-label">PG (세무 포함)</div>
+      <div class="result-amount" id="pg-total">—</div>
+      <div class="result-sub" id="pg-break">월 비용</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">비용 비교 시각화</div>
+    <div class="bar-wrap">
+      <div class="bar-label"><span id="van-bar-label" style="color:var(--accent)">VAN + 세무사</span><span id="van-pct">—</span></div>
+      <div class="bar-track"><div class="bar-fill bar-van" id="van-bar" style="width:0%"></div></div>
+    </div>
+    <div class="bar-wrap">
+      <div class="bar-label"><span id="pg-bar-label" style="color:var(--danger)">PG 수수료</span><span id="pg-pct">—</span></div>
+      <div class="bar-track"><div class="bar-fill bar-pg" id="pg-bar" style="width:100%"></div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="summary-row"><span class="label">VAN 수수료 (월)</span><span class="value" id="van-fee-d">—</span></div>
+    <div class="summary-row"><span class="label">세무사 기장료 (월)</span><span class="value" id="acct-d">—</span></div>
+    <div class="summary-row"><span class="label">VAN 방식 합계 (월)</span><span class="value" id="van-m">—</span></div>
+    <div class="summary-row"><span class="label">PG 수수료 합계 (월)</span><span class="value" id="pg-m">—</span></div>
+    <div class="summary-row"><span class="label" style="font-weight:700;color:var(--text)">연간 차이</span><span class="value" style="font-size:18px" id="ann-diff">—</span></div>
+    <div class="divider"></div>
+    <div class="info-note" id="compare-info-note"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">매출 구간별 연간 비교표</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>월 카드매출</th><th>VAN수수료(월)</th><th>세무사 포함(월)</th><th>PG수수료(월)</th><th>월 차이</th><th>연간 차이</th></tr></thead>
+        <tbody id="cmp-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 세금 포함 실질 비용 비교 -->
+  <div class="card">
+    <div class="card-title">세금 계산 반영 — 실질 총비용 비교</div>
+    <div class="info-note" id="cmp-tax-source-note">④ 세금 계산 탭의 결과가 자동으로 반영됩니다.</div>
+
+    <div class="cmp-full-grid" id="cmp-full-grid">
+      <!-- JS로 렌더링 -->
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="card-title" style="margin-top:4px">수수료 + 세금 합산 연간 실부담 비교</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>항목</th>
+            <th style="color:var(--accent)">VAN + 자체신고</th>
+            <th style="color:var(--danger)">PG (세무포함)</th>
+            <th>차이</th>
+          </tr>
+        </thead>
+        <tbody id="cmp-tax-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="divider"></div>
+    <div class="saving-box" style="margin-bottom:0">
+      <div class="saving-label">수수료 + 세금 포함 연간 실질 절감액</div>
+      <div class="saving-amount" id="real-saving-amount">—</div>
+      <div class="saving-sub" id="real-saving-sub">수수료 절감 + 세금 차이 합산</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ===== 천단위 쉼표 유틸 =====
+const fmtComma = n => Math.round(n).toLocaleString('ko-KR');
+const stripComma = s => parseFloat(String(s).replace(/,/g,''))||0;
+function onFocusFmt(el){ el.type='number'; el.value=stripComma(el.value)||''; }
+function onBlurFmt(el,rawId){ el.type='text'; const r=stripComma(el.value); if(rawId)document.getElementById(rawId).value=r; el.value=r>0?fmtComma(r):''; updateAll(); }
+// 아코디언 입력 이벤트
+function accFocus(el){ el.type='number'; el.value=stripComma(el.value)||''; }
+function accBlur(el,idx,field){ const r=stripComma(el.value); el.type='text'; el.value=r>0?fmtComma(r):''; onMonthInput(idx,field,r); }
+function accInput(el,idx,field){ el.value=el.value.replace(/[^0-9]/g,''); onMonthInput(idx,field,el.value); }
+
+// ===== 전역 데이터 =====
+let ledgerRows = [];
+let uploadedRows = [];
+let rowId = 0;
+
+const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+let monthlyData = Array.from({length:12},()=>({sales:0,card:0,cashReceipt:0,cost:0,exempt:0,exemptManual:false}));
+
+const fmt = n => Math.round(n).toLocaleString('ko-KR');
+const toNum = v => parseFloat(String(v).replace(/,/g,''))||0;
+
+// ===== 아코디언 초기화 =====
+function initMonthlyTable(){
+  const list = document.getElementById('accordion-list');
+  if(!list) return;
+  list.innerHTML = MONTHS.map((m,i) => `
+    <div class="acc-item" id="acc-${i}">
+      <div class="acc-header" onclick="toggleAcc(${i})">
+        <span class="acc-month">${m}</span>
+        <div class="acc-chips" id="acc-chips-${i}"><span class="acc-chip acc-chip-empty">미입력 (0원)</span></div>
+        <span class="acc-arrow">▼</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-grid">
+          <div class="acc-field" style="grid-column:1/-1">
+            <label>총 매출</label>
+            <div class="acc-input-wrap">
+              <input class="acc-input" id="ms-${i}" type="text" onfocus="accFocus(this)" onblur="accBlur(this,${i},'sales')" oninput="accInput(this,${i},'sales')" placeholder="0">
+              <span class="acc-unit">원</span>
+            </div>
+            <span class="hint">카드 + 현금영수증 + 현금 전체</span>
+          </div>
+          <div class="acc-field">
+            <label>카드결제 금액</label>
+            <div class="acc-input-wrap">
+              <input class="acc-input" id="mc-${i}" type="text" onfocus="accFocus(this)" onblur="accBlur(this,${i},'card')" oninput="accInput(this,${i},'card')" placeholder="0">
+              <span class="acc-unit">원</span>
+            </div>
+            <span class="hint">카드사 앱·문자 확인</span>
+          </div>
+          <div class="acc-field">
+            <label>현금영수증 금액</label>
+            <div class="acc-input-wrap">
+              <input class="acc-input" id="mcr-${i}" type="text" onfocus="accFocus(this)" onblur="accBlur(this,${i},'cashReceipt')" oninput="accInput(this,${i},'cashReceipt')" placeholder="0">
+              <span class="acc-unit">원</span>
+            </div>
+            <span class="hint">홈택스 → 현금영수증 매출내역</span>
+          </div>
+          <div class="acc-divider"></div>
+          <div class="acc-field">
+            <label>재료비 (식자재 전체)</label>
+            <div class="acc-input-wrap">
+              <input class="acc-input" id="mco-${i}" type="text" onfocus="accFocus(this)" onblur="accBlur(this,${i},'cost')" oninput="accInput(this,${i},'cost')" placeholder="0">
+              <span class="acc-unit">원</span>
+            </div>
+            <span class="hint">면세·과세 재료 합산</span>
+          </div>
+          <div class="acc-field">
+            <label>면세재료 <span style="font-weight:400;font-size:9px;color:var(--accent);letter-spacing:0;text-transform:none">(비우면 재료비×70% 자동)</span></label>
+            <div class="acc-input-wrap">
+              <input class="acc-input" id="mex-${i}" type="text" onfocus="accFocus(this)" onblur="accBlur(this,${i},'exempt')" oninput="accInput(this,${i},'exempt')" placeholder="자동">
+              <span class="acc-unit">원</span>
+            </div>
+            <span class="hint">채소·고기·생선 등 부가세 없는 재료</span>
+          </div>
+          <div class="acc-warn" id="acc-warn-${i}"></div>
+          <div class="acc-summary" id="acc-sum-${i}">
+            <span class="asl">이달 매출 − 재료비</span>
+            <span class="asv" id="acc-sumv-${i}">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleAcc(i){ document.getElementById(`acc-${i}`).classList.toggle('open'); }
+function expandAllMonths(){ for(let i=0;i<12;i++) document.getElementById(`acc-${i}`).classList.add('open'); }
+function collapseAllMonths(){ for(let i=0;i<12;i++) document.getElementById(`acc-${i}`).classList.remove('open'); }
+
+function onMonthInput(idx,field,val){
+  const num=toNum(val);
+  monthlyData[idx][field]=num;
+  if(field==='exempt') monthlyData[idx].exemptManual=num>0;
+  if(field==='cost'&&!monthlyData[idx].exemptManual) monthlyData[idx].exempt=num*0.7;
+  refreshAccItem(idx);
+  syncHiddenFields();
+  updateAll();
+}
+
+function refreshAccItem(idx){
+  const d=monthlyData[idx];
+  const hasData=d.sales>0||d.cost>0;
+  const item=document.getElementById(`acc-${idx}`);
+  if(!item) return;
+  item.classList.toggle('has-data',hasData);
+  const chips=document.getElementById(`acc-chips-${idx}`);
+  if(!hasData){
+    chips.innerHTML='<span class="acc-chip acc-chip-empty">미입력 (0원)</span>';
+  } else {
+    const profit=d.sales-d.cost;
+    chips.innerHTML=`
+      ${d.sales>0?`<span class="acc-chip acc-chip-sales">매출 ${fmt(d.sales)}원</span>`:''}
+      ${d.cost>0?`<span class="acc-chip acc-chip-cost">재료 ${fmt(d.cost)}원</span>`:''}
+      ${d.sales>0?`<span class="acc-chip acc-chip-profit">${profit>=0?'수익':'손실'} ${fmt(Math.abs(profit))}원</span>`:''}`;
+  }
+  const sumv=document.getElementById(`acc-sumv-${idx}`);
+  if(sumv) sumv.textContent=d.sales>0?fmt(d.sales-d.cost)+'원':'—';
+  const warn=document.getElementById(`acc-warn-${idx}`);
+  if(warn){
+    if(d.card+d.cashReceipt>d.sales&&d.sales>0){
+      warn.style.display='block';
+      warn.textContent=`⚠️ 카드(${fmt(d.card)})+현금영수증(${fmt(d.cashReceipt)})이 총매출(${fmt(d.sales)})을 초과합니다.`;
+    } else warn.style.display='none';
+  }
+  refreshAnnualSummary();
+}
+
+function refreshAnnualSummary(){
+  const totSales=monthlyData.reduce((s,d)=>s+d.sales,0);
+  const totCost=monthlyData.reduce((s,d)=>s+d.cost,0);
+  const totExempt=monthlyData.reduce((s,d)=>s+d.exempt,0);
+  const filledN=monthlyData.filter(d=>d.sales>0||d.cost>0).length;
+  const getRaw=id=>{ const r=document.getElementById(id+'-raw'); return r?toNum(r.value):toNum(document.getElementById(id)?document.getElementById(id).value:0); };
+  const mr=getRaw('monthly-rent'), ml=getRaw('monthly-labor'), me=getRaw('monthly-etc');
+  const netIncome=totSales-totCost-(mr+ml+me)*12;
+  const dots=MONTHS.map((_,i)=>`<div class="mp-dot ${monthlyData[i].sales>0||monthlyData[i].cost>0?'filled':''}"></div>`).join('');
+  const wrap=document.getElementById('monthly-annual-summary');
+  if(!wrap) return;
+  wrap.innerHTML=`
+    <div class="annual-chip"><div class="ac-label">입력 현황</div><div class="ac-val ac-blue">${filledN} / 12개월</div><div class="month-progress">${dots}</div></div>
+    <div class="annual-chip"><div class="ac-label">연간 매출</div><div class="ac-val ac-green">${fmt(totSales)}원</div><div class="ac-sub">미입력 월 0원 처리</div></div>
+    <div class="annual-chip"><div class="ac-label">연간 재료비</div><div class="ac-val ac-muted">${fmt(totCost)}원</div><div class="ac-sub">면세 ${fmt(totExempt)}원 포함</div></div>
+    <div class="annual-chip"><div class="ac-label">추정 순이익</div><div class="ac-val ac-orange">${fmt(netIncome)}원</div><div class="ac-sub">매출−재료비−고정비</div></div>`;
+}
+
+function syncHiddenFields(){
+  const tot=key=>monthlyData.reduce((s,d)=>s+d[key],0);
+  document.getElementById('monthly-sales').value=Math.round(tot('sales')/12);
+  document.getElementById('monthly-cost').value=Math.round(tot('cost')/12);
+  document.getElementById('exempt-amount').value=Math.round(tot('exempt')/12);
+  document.getElementById('card-amount').value=Math.round(tot('card')/12);
+  document.getElementById('cash-receipt-amount').value=Math.round(tot('cashReceipt')/12);
+}
+
+function setAccInputs(i,d){
+  const map={ms:'sales',mc:'card',mcr:'cashReceipt',mco:'cost',mex:'exempt'};
+  Object.entries(map).forEach(([p,k])=>{ const el=document.getElementById(`${p}-${i}`); if(el){el.type='text';el.value=d[k]>0?fmtComma(d[k]):'';} });
+}
+
+function copyPrevToEmpty(){
+  let src=null;
+  for(let i=0;i<12;i++) if(monthlyData[i].sales>0||monthlyData[i].cost>0) src=i;
+  if(src===null){alert('먼저 한 달이라도 입력해 주세요.');return;}
+  const ref=monthlyData[src];
+  for(let i=0;i<12;i++){
+    if(monthlyData[i].sales===0&&monthlyData[i].cost===0){
+      monthlyData[i]={...ref};
+      setAccInputs(i,ref);
+      refreshAccItem(i);
+    }
+  }
+  syncHiddenFields(); updateAll();
+}
+
+function clearAllMonths(){
+  if(!confirm('월별 입력 데이터를 전체 초기화할까요?')) return;
+  monthlyData=Array.from({length:12},()=>({sales:0,card:0,cashReceipt:0,cost:0,exempt:0,exemptManual:false}));
+  for(let i=0;i<12;i++){ setAccInputs(i,{sales:0,card:0,cashReceipt:0,cost:0,exempt:0}); refreshAccItem(i); }
+  syncHiddenFields(); updateAll();
+}
+
+// ===== 탭 전환 =====
+// ===== 탭 전환 =====
+function switchTab(i) {
+  document.querySelectorAll('.tab-content').forEach((el,j) => el.classList.toggle('active', i===j));
+  document.querySelectorAll('.tab').forEach((el,j) => el.classList.toggle('active', i===j));
+  if(i===3) updateTax();
+  if(i===4) renderReports();
+  if(i===5){ updateTax(); updateCompare(); } // 세금 최신화 후 비교
+}
+
+// ===== 수동 거래내역 =====
+function addRow(type) {
+  rowId++;
+  const today = new Date().toISOString().split('T')[0];
+  const wrap = document.getElementById('ledger-rows');
+  const div = document.createElement('div');
+  div.className='entry-row'; div.id='er-'+rowId;
+  div.innerHTML=`
+    <input type="date" value="${today}" class="r-date">
+    <input type="text" placeholder="${type==='income'?'카드매출 / 현금':'재료구매 / 임차료'}" class="r-desc">
+    <select class="r-type">
+      <option value="income" ${type==='income'?'selected':''}>매출</option>
+      <option value="expense" ${type==='expense'?'selected':''}>매입/경비</option>
+    </select>
+    <select class="r-pay">
+      <option value="card">카드</option>
+      <option value="cash_receipt">현금영수증</option>
+      <option value="invoice">세금계산서</option>
+      <option value="cash">현금(미발급)</option>
+    </select>
+    <input type="number" placeholder="금액" class="r-amt" oninput="refreshLedger();updateAll()">
+    <button class="btn-del" onclick="delRow(${rowId})">×</button>
+  `;
+  wrap.appendChild(div);
+  div.querySelector('.r-type').addEventListener('change', refreshLedger);
+  div.querySelector('.r-pay').addEventListener('change', refreshLedger);
+}
+
+function delRow(id) {
+  const el=document.getElementById('er-'+id);
+  if(el) el.remove();
+  refreshLedger();
+}
+
+function refreshLedger() {
+  const rows = [...document.querySelectorAll('.entry-row')];
+  const tbody = document.getElementById('ledger-tbody');
+  tbody.innerHTML = '';
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px;">거래내역 없음</td></tr>';return;}
+  rows.forEach(row=>{
+    const date=row.querySelector('.r-date').value;
+    const desc=row.querySelector('.r-desc').value||'(내용 없음)';
+    const type=row.querySelector('.r-type').value;
+    const pay=row.querySelector('.r-pay').value;
+    const amt=parseFloat(row.querySelector('.r-amt').value)||0;
+    if(!amt) return;
+    const qualified=['card','cash_receipt','invoice'].includes(pay);
+    const payLabel={card:'카드',cash_receipt:'현금영수증',invoice:'세금계산서',cash:'현금'}[pay];
+    tbody.innerHTML+=`<tr>
+      <td>${date}</td><td>${desc}</td>
+      <td><span class="tag tag-${type==='income'?'매출':'매입'}">${type==='income'?'매출':'매입'}</span></td>
+      <td><span class="tag tag-${payLabel}">${payLabel}</span></td>
+      <td><span class="tag tag-${qualified?'적격':'비적격'}">${qualified?'적격':'비적격'}</span></td>
+      <td style="text-align:right" class="${type==='income'?'amt-plus':'amt-minus'}">${type==='income'?'+':'-'}${fmt(amt)}</td>
+    </tr>`;
+  });
+}
+
+function applyLedger() {
+  forcedSource = null;
+  updateAll();
+  switchTab(3);
+}
+
+// ===== 파일 업로드 =====
+function onDrag(e,id){e.preventDefault();document.getElementById(id).classList.add('dragover');}
+function offDrag(id){document.getElementById(id).classList.remove('dragover');}
+function onDrop(e,type){
+  e.preventDefault();
+  offDrag(type==='csv'?'csv-zone':'xlsx-zone');
+  const file=e.dataTransfer.files[0];
+  if(!file) return;
+  if(type==='csv') parseCSV(file); else parseXLSX(file);
+}
+
+// CSV 파싱 (홈택스 현금영수증)
+function handleCSV(e){ const f=e.target.files[0]; if(f) parseCSV(f); }
+function parseCSV(file){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const text=e.target.result;
+    const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(lines.length<2){showUploadResult('csv','파싱 실패: 데이터가 없습니다.',false);return;}
+    // 헤더 자동 감지
+    const header=lines[0].split(',').map(h=>h.replace(/[""]/g,'').trim());
+    const rows=[];
+    const colMap=autoMapColumns(header,['date','desc','amount','supply','vat']);
+    for(let i=1;i<lines.length;i++){
+      const cols=lines[i].split(',').map(c=>c.replace(/[""]/g,'').trim());
+      if(cols.length<3) continue;
+      const date=cols[colMap.date]||cols[0]||'';
+      const desc=cols[colMap.desc]||cols[1]||'홈택스 현금영수증';
+      const amtRaw=(cols[colMap.amount]||cols[2]||'0').replace(/,/g,'');
+      const amt=parseFloat(amtRaw)||0;
+      if(!amt) continue;
+      rows.push({date:normalizeDate(date),desc,type:'income',pay:'cash_receipt',amt,source:'홈택스CSV',qualified:true});
+    }
+    uploadedRows=[...uploadedRows,...rows];
+    renderUploadedTable();
+    forcedSource = null; // 자동 소스 선택으로 리셋
+    showUploadResult('csv',`✅ ${rows.length}건 파싱 완료 (현금영수증 매출)`,true);
+    updateAll();
+  };
+  reader.readAsText(file,'utf-8');
+}
+
+// XLSX 파싱 (카드사 거래내역)
+function handleXLSX(e){ const f=e.target.files[0]; if(f) parseXLSX(f); }
+function parseXLSX(file){
+  // 오프라인 환경에서 xlsx.js 로드 실패 시 안내
+  if(window._xlsxFailed || typeof XLSX === 'undefined'){
+    showUploadResult('xlsx','⚠️ 오프라인 환경에서는 엑셀(.xlsx) 업로드가 불가합니다. CSV 파일로 변환 후 업로드하거나, 샘플 데이터를 사용해 주세요.', false);
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(data.length<2){showUploadResult('xlsx','파싱 실패: 데이터가 없습니다.',false);return;}
+      const header=data[0].map(h=>String(h).trim());
+      const colMap=autoMapColumns(header,['date','desc','amount','type']);
+      const rows=[];
+      for(let i=1;i<data.length;i++){
+        const row=data[i];
+        const dateRaw=row[colMap.date]||row[0];
+        const desc=String(row[colMap.desc]||row[1]||'카드거래').trim();
+        const amtRaw=String(row[colMap.amount]||row[2]||'0').replace(/,/g,'');
+        const amt=parseFloat(amtRaw)||0;
+        if(!amt) continue;
+        // 매출/매입 자동 분류
+        const typeHint=String(row[colMap.type]||'').toLowerCase();
+        const isExpense=typeHint.includes('매입')||typeHint.includes('출금')||typeHint.includes('지출')||
+                        desc.includes('재료')||desc.includes('도매')||desc.includes('마트')||desc.includes('구매');
+        rows.push({
+          date:normalizeDate(String(dateRaw)),
+          desc,
+          type:isExpense?'expense':'income',
+          pay:'card',
+          amt,
+          source:'카드사엑셀',
+          qualified:true
+        });
+      }
+      uploadedRows=[...uploadedRows,...rows];
+      renderUploadedTable();
+      forcedSource = null;
+      showUploadResult('xlsx',`✅ ${rows.length}건 파싱 완료 (카드 거래내역 자동 분류)`,true);
+      updateAll();
+    }catch(err){
+      showUploadResult('xlsx','파싱 오류: '+err.message,false);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// 컬럼 자동 매핑
+function autoMapColumns(headers,keys){
+  const map={};
+  const patterns={
+    date:['일자','날짜','date','거래일','승인일','결제일'],
+    desc:['내용','가맹점','거래처','상호','품목','desc','적요','거래내용','사용처'],
+    amount:['금액','승인금액','거래금액','결제금액','공급대가','amount','amt','합계'],
+    supply:['공급가액','공급금액','supply'],
+    vat:['부가세','vat','세액'],
+    type:['구분','type','분류','입출금']
+  };
+  keys.forEach(key=>{
+    const p=patterns[key]||[];
+    let found=false;
+    headers.forEach((h,i)=>{
+      if(!found && p.some(pat=>h.toLowerCase().includes(pat.toLowerCase()))){
+        map[key]=i; found=true;
+      }
+    });
+    if(!found) map[key]=keys.indexOf(key); // fallback: 순서
+  });
+  return map;
+}
+
+function normalizeDate(raw){
+  if(!raw) return new Date().toISOString().split('T')[0];
+  const s=String(raw).replace(/[./]/g,'-').trim();
+  // YYYYMMDD
+  if(/^\d{8}$/.test(s)) return s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8);
+  // 엑셀 시리얼 숫자
+  if(/^\d{5}$/.test(s)){
+    const d=new Date((parseInt(s)-25569)*86400*1000);
+    return d.toISOString().split('T')[0];
+  }
+  return s.slice(0,10);
+}
+
+function renderUploadedTable(){
+  const tbody=document.getElementById('upload-tbody');
+  if(!uploadedRows.length){
+    tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px;">업로드된 데이터 없음</td></tr>';
+    document.getElementById('upload-count').textContent='';
+    return;
+  }
+  document.getElementById('upload-count').textContent=`총 ${uploadedRows.length}건`;
+  tbody.innerHTML=uploadedRows.map((r,i)=>{
+    const payLabel={card:'카드',cash_receipt:'현금영수증',invoice:'세금계산서',cash:'현금'}[r.pay]||r.pay;
+    return `<tr>
+      <td>${r.date}</td>
+      <td>${r.desc}</td>
+      <td style="font-size:10px;color:var(--muted)">${r.source}</td>
+      <td><span class="tag tag-${r.type==='income'?'매출':'매입'}">${r.type==='income'?'매출':'매입'}</span></td>
+      <td><span class="tag tag-${payLabel}">${payLabel}</span></td>
+      <td><span class="tag tag-${r.qualified?'적격':'비적격'}">${r.qualified?'적격':'비적격'}</span></td>
+      <td style="text-align:right" class="${r.type==='income'?'amt-plus':'amt-minus'}">${r.type==='income'?'+':'-'}${fmt(r.amt)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function showUploadResult(type,msg,ok){
+  const el=document.getElementById(type+'-result');
+  el.textContent=msg;
+  el.style.display='block';
+  el.style.background=ok?'rgba(0,229,160,.08)':'rgba(255,77,109,.08)';
+  el.style.borderColor=ok?'rgba(0,229,160,.2)':'rgba(255,77,109,.2)';
+  el.style.color=ok?'var(--accent)':'var(--danger)';
+}
+
+function clearUploaded(){
+  uploadedRows=[];
+  forcedSource=null;
+  renderUploadedTable();
+  document.getElementById('upload-count').textContent='';
+  updateAll();
+}
+
+function applyUploaded(){
+  if(!uploadedRows.length){alert('업로드된 데이터가 없습니다.');return;}
+  forcedSource = null; // 파일 우선으로 자동 설정
+  updateAll();
+  switchTab(3);
+}
+
+// 샘플 데이터
+function loadSampleCSV(){
+  const sample=[
+    '거래일자,가맹점명,승인금액,공급가액,부가세',
+    '2025-01-05,맛있는국수집,320000,290910,29090',
+    '2025-01-06,맛있는국수집,415000,377273,37727',
+    '2025-01-07,맛있는국수집,280000,254545,25455',
+    '2025-01-08,맛있는국수집,510000,463636,46364',
+    '2025-01-09,맛있는국수집,380000,345455,34545',
+  ].join('\n');
+  const blob=new Blob([sample],{type:'text/csv'});
+  parseCSV(blob);
+}
+
+function loadSampleXLSX(){
+  const sampleRows=[
+    {date:'2025-01-05',desc:'카드매출 (점심)',amount:320000,type:'매출'},
+    {date:'2025-01-06',desc:'카드매출 (저녁)',amount:215000,type:'매출'},
+    {date:'2025-01-06',desc:'도매시장 재료구매',amount:180000,type:'매입'},
+    {date:'2025-01-07',desc:'카드매출',amount:410000,type:'매출'},
+    {date:'2025-01-08',desc:'농협 면세농산물 구매',amount:95000,type:'매입'},
+    {date:'2025-01-09',desc:'카드매출',amount:380000,type:'매출'},
+  ];
+  sampleRows.forEach(r=>{
+    const isExpense=r.type==='매입';
+    uploadedRows.push({
+      date:r.date,desc:r.desc,type:isExpense?'expense':'income',
+      pay:'card',amt:r.amount,source:'카드사엑셀',qualified:true
+    });
+  });
+  renderUploadedTable();
+  forcedSource = null;
+  showUploadResult('xlsx',`✅ 샘플 ${sampleRows.length}건 로드 완료`,true);
+  updateAll();
+}
+
+// ===== 세금 계산 =====
+// ===== 데이터 소스 우선순위 엔진 =====
+// 우선순위: 파일업로드 > 거래내역수동 > 기본정보
+// 각 소스에 데이터가 있으면 해당 소스 사용, 없으면 다음 단계로 fallback
+
+function getActiveSource(){
+  if(forcedSource) return forcedSource;
+  const hasFile = uploadedRows.length > 0;
+  // 거래내역: 금액이 있는 행이 1개 이상이고, 설명도 입력된 경우만 유효
+  const ledgerRows = [...document.querySelectorAll('.entry-row')];
+  const hasLedger = ledgerRows.some(r => {
+    const amt = toNum(r.querySelector('.r-amt').value);
+    const desc = (r.querySelector('.r-desc').value||'').trim();
+    return amt > 0 && desc.length > 0; // 금액 + 내용 둘 다 있어야 유효
+  });
+  // 기본정보 월별 데이터
+  const hasMonthly = monthlyData.some(d=>d.sales>0||d.cost>0);
+  if(hasFile) return 'file';
+  if(hasLedger) return 'ledger';
+  return 'basic';
+}
+
+function resolveCalcData(){
+  const src = getActiveSource(); // forcedSource 포함하여 반환
+  let ms, mc, exemptMonthly;
+
+  if(src === 'file'){
+    const allIncome  = uploadedRows.filter(r=>r.type==='income');
+    const allExpense = uploadedRows.filter(r=>r.type==='expense');
+    const totalIncome  = allIncome.reduce((s,r)=>s+r.amt,0);
+    const totalExpense = allExpense.reduce((s,r)=>s+r.amt,0);
+    const dates  = uploadedRows.map(r=>r.date).filter(Boolean).sort();
+    const months = estimateMonths(dates);
+    ms = months > 0 ? totalIncome/months : totalIncome;
+    mc = months > 0 ? totalExpense/months : totalExpense;
+    const fileExempt = uploadedRows
+      .filter(r=>r.type==='expense'&&(r.desc.includes('농산')||r.desc.includes('면세')||
+        r.desc.includes('농협')||r.desc.includes('수산')||r.desc.includes('축산')))
+      .reduce((s,r)=>s+r.amt,0);
+    exemptMonthly = fileExempt>0 ? (months>0?fileExempt/months:fileExempt)
+      : (toNum(document.getElementById('exempt-amount').value));
+
+  } else if(src === 'ledger'){
+    const rows = [...document.querySelectorAll('.entry-row')];
+    let income=0,expense=0,exempt=0;
+    rows.forEach(r=>{
+      const t=r.querySelector('.r-type').value;
+      const p=r.querySelector('.r-pay').value;
+      const a=toNum(r.querySelector('.r-amt').value);
+      const desc=(r.querySelector('.r-desc').value||'').toLowerCase();
+      if(t==='income') income+=a;
+      else {
+        expense+=a;
+        if(p==='invoice'||desc.includes('면세')||desc.includes('채소')||
+           desc.includes('고기')||desc.includes('생선')||desc.includes('도매')||
+           desc.includes('농산')||desc.includes('수산')||desc.includes('농협')){
+          exempt+=a;
+        }
+      }
+    });
+    ms=income; mc=expense;
+    exemptMonthly = exempt>0 ? exempt : toNum(document.getElementById('exempt-amount').value);
+
+  } else {
+    // basic — 월별 데이터 항상 12개월 기준 (미입력=0원)
+    const totSales  = monthlyData.reduce((s,d)=>s+d.sales,0);
+    const totCost   = monthlyData.reduce((s,d)=>s+d.cost,0);
+    const totExempt = monthlyData.reduce((s,d)=>s+d.exempt,0);
+    const anyData   = totSales>0 || totCost>0;
+    if(anyData){
+      ms = totSales / 12;
+      mc = totCost  / 12;
+      exemptMonthly = totExempt / 12;
+    } else {
+      ms = toNum(document.getElementById('monthly-sales').value);
+      mc = toNum(document.getElementById('monthly-cost').value);
+      exemptMonthly = toNum(document.getElementById('exempt-amount').value);
+    }
+  }
+
+  const getRaw = id => {
+    const rawEl = document.getElementById(id+'-raw');
+    if(rawEl) return toNum(rawEl.value);
+    const el = document.getElementById(id);
+    if(!el) return 0;
+    return toNum(el.value); // 천단위 쉼표 포함 텍스트도 toNum이 처리
+  };
+  const mr = getRaw('monthly-rent');
+  const ml = getRaw('monthly-labor');
+  const me = getRaw('monthly-etc');
+  return { src, ms, mc, mr, ml, me, exemptMonthly };
+}
+
+function estimateMonths(sortedDates){
+  if(!sortedDates.length) return 1;
+  if(sortedDates.length === 1) return 1;
+  const first = new Date(sortedDates[0]);
+  const last = new Date(sortedDates[sortedDates.length-1]);
+  const diff = (last - first) / (1000*60*60*24*30);
+  return Math.max(1, Math.round(diff) || 1);
+}
+
+function renderSourceBanner(src, data){
+  // 탭 인덱스 매핑: 기본정보=0, 수동입력=1(거래내역), 파일=2
+  const TAB_IDX = { basic:0, ledger:1, file:2 };
+  const labels = {
+    basic:  { cls:'src-basic',  icon:'📋', label:'기본정보',   detail:'월별 기본정보 입력값 기준으로 계산 중',   tab:0 },
+    ledger: { cls:'src-ledger', icon:'✏️', label:'수동 입력', detail:'직접 입력한 거래내역 기준으로 계산 중',   tab:1 },
+    file:   { cls:'src-file',   icon:'📂', label:'파일 업로드', detail:`업로드된 ${uploadedRows.length}건 기준으로 계산 중`, tab:2 }
+  };
+  const l = labels[src];
+  // 순서: 기본정보 → 수동 → 파일 (탭 순서와 동일)
+  const srcOrder = ['basic','ledger','file'];
+  const chips = srcOrder.map(s=>`
+    <span class="source-chip ${s===src?'active-chip':'inactive-chip'}"
+      onclick="forceSourceAndNav('${s}')"
+      title="${labels[s].label} 탭으로 이동">
+      ${labels[s].icon} ${labels[s].label}
+    </span>`).join('');
+  document.getElementById('data-source-banner').innerHTML=`
+    <div class="source-banner ${l.cls}">
+      <div class="source-dot"></div>
+      <div class="src-banner-text">
+        <span class="src-label">${l.icon} ${l.label} 기준</span>
+        <span class="src-detail">${l.detail}</span>
+      </div>
+      <div class="source-chips">${chips}</div>
+    </div>`;
+}
+
+// 소스 강제 선택 + 해당 탭으로 이동
+let forcedSource = null;
+function forceSource(src){ forcedSource=src; updateAll(); }
+function forceSourceAndNav(src){
+  forcedSource = src;
+  updateAll();
+  const tabMap = { basic:0, ledger:1, file:2 };
+  switchTab(tabMap[src]);
+}
+
+function getActiveSourceWithForce(){
+  if(forcedSource) return forcedSource;
+  return getActiveSource();
+}
+
+// ===== 세금 계산 (소스 자동 해결) =====
+function updateTax(){
+  const calcData = resolveCalcData();
+  const {ms, mc, mr, ml, me, exemptMonthly} = calcData;
+  const activeSrc = calcData.src;
+  const taxType = document.getElementById('tax-type').value;
+  const year    = document.getElementById('calc-year').value;
+
+  // 연간 매출/경비 계산 — 미입력 월은 0원, 항상 12개월 기준
+  const hasMonthlyData = monthlyData.some(d=>d.sales>0||d.cost>0);
+  let as, ae, exemptPurchase;
+
+  if(activeSrc==='basic' && hasMonthlyData){
+    // 월별 실제 합산 (미입력 달 = 0원)
+    as = monthlyData.reduce((s,d)=>s+d.sales,0);
+    const totMonthlyCost = monthlyData.reduce((s,d)=>s+d.cost,0);
+    ae = totMonthlyCost + (mr + ml + me) * 12;
+    exemptPurchase = monthlyData.reduce((s,d)=>s+d.exempt,0);
+  } else {
+    as = ms * 12;
+    ae = (mc + mr + ml + me) * 12;
+    exemptPurchase = exemptMonthly * 12;
+  }
+
+  // 배너 업데이트
+  renderSourceBanner(activeSrc, calcData);
+
+  // ④ 탭 매출/매입 현황
+  document.getElementById('annual-sales').textContent = fmt(as)+'원';
+  document.getElementById('annual-cost').textContent  = fmt(ae)+'원';
+  document.getElementById('sales-sub').textContent =
+    activeSrc==='file'   ? `업로드 데이터 월평균 ${fmt(ms)}원 × 12` :
+    activeSrc==='ledger' ? `수동 입력 합계 ${fmt(ms)}원 (월 기준)` :
+    hasMonthlyData       ? `월별 입력 12개월 합산 (미입력 달 0원)` :
+    `기본정보 입력 월 ${fmt(ms)}원 × 12개월`;
+
+  // 의제매입세액공제
+  let deemedDeduction = 0;
+  if(taxType==='general'){
+    document.getElementById('deduction-section').style.display='block';
+    const deductRate = 8/108;
+    const beforeLimit = exemptPurchase * deductRate;
+    let limitRate = as<=100000000 ? 0.75 : as<=200000000 ? 0.70 : 0.60;
+    const limitAmount = as * limitRate * deductRate;
+    deemedDeduction = Math.min(beforeLimit, limitAmount);
+    document.getElementById('d-exempt-purchase').textContent = fmt(exemptPurchase)+'원';
+    document.getElementById('d-rate').textContent = `8/108 (${year}년 음식점 개인사업자)`;
+    document.getElementById('d-before-limit').textContent = fmt(beforeLimit)+'원';
+    document.getElementById('d-limit-rate').textContent = `${(limitRate*100).toFixed(0)}% (연매출 ${fmt(as)}원 기준)`;
+    document.getElementById('d-limit-amount').textContent = fmt(limitAmount)+'원';
+    document.getElementById('d-final').textContent = fmt(deemedDeduction)+'원';
+    document.getElementById('d-2026').textContent =
+      as<=200000000 ? '2026년부터 한도율 50%로 축소 예정' : '2026년부터 한도율 40%로 축소 예정';
+  } else {
+    document.getElementById('deduction-section').style.display='none';
+  }
+
+  // 부가가치세
+  let vat=0, vatSub='';
+  if(as < 48000000){
+    vat=0; vatSub='연매출 4,800만원 미만 → 납부 면제';
+  } else if(taxType==='simple'){
+    vat = as * 0.15 * 0.10;
+    vatSub = `간이: ${fmt(as)}×15%×10%`;
+  } else {
+    const vatOnSales = as * 0.10;
+    vat = Math.max(0, vatOnSales - deemedDeduction);
+    vatSub = `일반: 매출세액 ${fmt(vatOnSales)}원 − 의제공제 ${fmt(deemedDeduction)}원`;
+  }
+
+  // 종합소득세
+  const netIncome = as - ae;
+  const taxable = Math.max(0, netIncome - 1500000);
+  let incomeTax = 0;
+  const brackets = [[14000000,.06,0],[50000000,.15,1260000],[88000000,.24,5760000],
+    [150000000,.35,15440000],[300000000,.38,19940000],[500000000,.40,25940000],
+    [1000000000,.42,35940000],[Infinity,.45,65940000]];
+  if(taxable > 0){
+    for(const [limit,rate,deduct] of brackets){
+      if(taxable <= limit){ incomeTax = taxable*rate - deduct; break; }
+    }
+  }
+  incomeTax = Math.max(0, incomeTax);
+  const localTax = incomeTax * 0.10;
+  const total = vat + incomeTax + localTax;
+  const netAfterTax = netIncome - total;
+
+  document.getElementById('vat-result').textContent = fmt(vat)+'원';
+  document.getElementById('vat-sub').textContent = vatSub;
+  document.getElementById('income-tax-result').textContent = fmt(incomeTax)+'원';
+  document.getElementById('income-tax-sub').textContent = `과세표준 ${fmt(taxable)}원`;
+  document.getElementById('local-tax-result').textContent = fmt(localTax)+'원';
+  document.getElementById('total-tax').textContent = fmt(total)+'원';
+  document.getElementById('monthly-tax').textContent = fmt(total/12)+'원/월';
+  document.getElementById('tax-rate').textContent = (as>0?(total/as*100).toFixed(1):0)+'%';
+  document.getElementById('net-profit').textContent = fmt(netAfterTax)+'원';
+
+  window._taxData = {as, ae, vat, incomeTax, localTax, total, vatSub, taxable, taxType, netIncome, activeSrc,
+    ms, mc, mr: parseFloat(document.getElementById('monthly-rent').value)||0,
+    ml: parseFloat(document.getElementById('monthly-labor').value)||0,
+    me: parseFloat(document.getElementById('monthly-etc').value)||0,
+    exemptMonthly, deemedDeduction };
+  renderCalcBasis();
+}
+
+// ===== 신고 요약서 =====
+function renderReports(){
+  const d=window._taxData;
+  if(!d){updateTax();return;}
+  const name=document.getElementById('biz-name').value||'사업장';
+  const year=document.getElementById('calc-year').value;
+  const taxType=document.getElementById('tax-type').value;
+  const isSimple=taxType==='simple';
+
+  const reports=[
+    {
+      title:'부가가치세 신고 (연간)',
+      badge:'badge-vat',badgeText:'부가가치세',
+      deadlines:isSimple?[`${+year+1}년 1월 25일 (확정신고)`]:[`${+year+1}년 1월 25일 (2기 확정)`,`${year}년 7월 25일 (1기 확정)`,`${year}년 4월, 10월 (예정고지)`],
+      rows:[
+        {l:'과세 유형', v:isSimple?'간이과세자':'일반과세자'},
+        {l:'연간 과세표준', v:fmt(d.as)+'원'},
+        {l:'매출세액', v:fmt(d.as*0.10)+'원'},
+        {l:'의제매입세액공제', v:isSimple?'해당없음':fmt(d.as*0.10-d.vat)+'원'},
+        {l:'신고 횟수', v:isSimple?'연 1회':'연 2회 (예정고지 포함)'},
+      ],
+      total:d.vat,
+      note:d.as<48000000?'⚠️ 연매출 4,800만원 미만으로 납부의무 면제':''
+    },
+    {
+      title:'종합소득세 신고',
+      badge:'badge-income',badgeText:'종합소득세',
+      deadlines:[`${+year+1}년 5월 31일 (일반)`, `${+year+1}년 6월 30일 (성실신고 대상자)`],
+      rows:[
+        {l:'총수입금액 (매출)', v:fmt(d.as)+'원'},
+        {l:'필요경비 (매입+경비)', v:fmt(d.ae)+'원'},
+        {l:'사업소득금액', v:fmt(d.netIncome)+'원'},
+        {l:'소득공제 (기본)', v:'1,500,000원 (간략 추정)'},
+        {l:'과세표준', v:fmt(d.taxable)+'원'},
+        {l:'적용세율', v:getTaxRate(d.taxable)},
+      ],
+      total:d.incomeTax,
+      note:'※ 실제 공제항목(인적공제, 4대보험료 등)에 따라 세액이 달라집니다.'
+    },
+    {
+      title:'지방소득세 신고',
+      badge:'badge-local',badgeText:'지방소득세',
+      deadlines:[`${+year+1}년 5월 31일 (종합소득세와 동시)`],
+      rows:[
+        {l:'종합소득세 기준', v:fmt(d.incomeTax)+'원'},
+        {l:'세율', v:'10%'},
+        {l:'납부세액', v:fmt(d.localTax)+'원'},
+      ],
+      total:d.localTax,
+      note:''
+    },
+    {
+      title:'납부세금 합계 요약',
+      badge:'badge-income',badgeText:'전체합계',
+      deadlines:['연간 일정 참조'],
+      rows:[
+        {l:'부가가치세', v:fmt(d.vat)+'원'},
+        {l:'종합소득세', v:fmt(d.incomeTax)+'원'},
+        {l:'지방소득세', v:fmt(d.localTax)+'원'},
+        {l:'월평균 세부담', v:fmt(d.total/12)+'원/월'},
+        {l:'실질 세부담률', v:(d.as>0?(d.total/d.as*100).toFixed(2):0)+'%'},
+      ],
+      total:d.total,
+      note:`${name} 기준 ${year}년도 예상 납부세금 총액`
+    }
+  ];
+
+  const list=document.getElementById('report-list');
+  list.innerHTML=reports.map(r=>`
+    <div class="report-card">
+      <div class="report-card-header">
+        <div>
+          <div class="report-card-title">${r.title}</div>
+          <div class="report-card-date">📅 신고기한: ${r.deadlines.join(' / ')}</div>
+        </div>
+        <span class="report-badge ${r.badge}">${r.badgeText}</span>
+      </div>
+      <div class="report-rows">
+        ${r.rows.map(row=>`
+          <div class="report-row">
+            <span class="rl">${row.l}</span>
+            <span class="rv">${row.v}</span>
+          </div>
+        `).join('')}
+      </div>
+      ${r.note?`<div class="info-note" style="margin-top:14px;margin-bottom:0">${r.note}</div>`:''}
+      <div class="report-total">
+        <span class="report-total-label">납부세액</span>
+        <span class="report-total-amount">${fmt(r.total)}원</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function getTaxRate(taxable){
+  if(taxable<=14000000) return '6%';
+  if(taxable<=50000000) return '15% (누진공제 126만원)';
+  if(taxable<=88000000) return '24% (누진공제 576만원)';
+  if(taxable<=150000000) return '35% (누진공제 1,544만원)';
+  if(taxable<=300000000) return '38% (누진공제 1,994만원)';
+  return '40%+';
+}
+
+// ===== 산출 근거 렌더링 =====
+function bRow(label, val, cls=''){
+  return `<div class="basis-row ${cls}"><span class="br-label">${label}</span><span class="br-val">${val}</span></div>`;
+}
+
+function renderCalcBasis(){
+  const d = window._taxData;
+  if(!d) return;
+  const {as, ae, vat, incomeTax, localTax, total, taxType, taxable, netIncome,
+         ms, mc, mr, ml, me, exemptMonthly, deemedDeduction} = d;
+  const isSimple = taxType === 'simple';
+
+  // ── 부가가치세 근거 ──
+  document.getElementById('basis-vat-total').textContent = fmt(vat)+'원';
+  let vatRows = '';
+  vatRows += bRow('연간 총 매출 (과세표준)', fmt(as)+'원');
+  if(as < 48000000){
+    vatRows += bRow('연매출 4,800만원 미만', '납부 면제 적용', 'br-deduct');
+    vatRows += bRow('최종 부가가치세', '0원', 'br-result');
+  } else if(isSimple){
+    vatRows += bRow('과세 유형', '간이과세자');
+    vatRows += bRow('음식점 업종 부가가치율', '15%', 'br-indent');
+    vatRows += bRow(`매출 × 부가가치율`, `${fmt(as)} × 15% = ${fmt(as*0.15)}원`, 'br-op');
+    vatRows += bRow('적용 세율', '10%', 'br-indent');
+    vatRows += bRow(`과세표준 × 10%`, `${fmt(as*0.15)} × 10% = ${fmt(vat)}원`, 'br-op');
+    vatRows += bRow('최종 부가가치세', fmt(vat)+'원', 'br-result');
+  } else {
+    const vatOnSales = as * 0.10;
+    vatRows += bRow('과세 유형', '일반과세자');
+    vatRows += bRow('매출세액 (매출 × 10%)', `${fmt(as)} × 10% = ${fmt(vatOnSales)}원`, 'br-op');
+    if(deemedDeduction > 0){
+      const exemptAnnual = exemptMonthly * 12;
+      vatRows += bRow('면세 재료 매입액 (연간)', fmt(exemptAnnual)+'원');
+      vatRows += bRow('의제매입세액공제율 (음식점)', '8/108', 'br-indent');
+      vatRows += bRow('공제 가능액', `${fmt(exemptAnnual)} × 8/108 = ${fmt(exemptAnnual*(8/108))}원`, 'br-indent');
+      vatRows += bRow('한도 적용 후 실제 공제액', `− ${fmt(deemedDeduction)}원`, 'br-deduct');
+    }
+    vatRows += bRow(`매출세액 − 의제공제`, `${fmt(vatOnSales)} − ${fmt(deemedDeduction)} = ${fmt(vat)}원`, 'br-op');
+    vatRows += bRow('최종 부가가치세', fmt(vat)+'원', 'br-result');
+  }
+  document.getElementById('basis-vat-body').innerHTML = vatRows;
+
+  // ── 종합소득세 근거 ──
+  document.getElementById('basis-income-total').textContent = fmt(incomeTax)+'원';
+  let incomeRows = '';
+  incomeRows += bRow('연간 총 매출', fmt(as)+'원');
+  incomeRows += bRow('연간 총 필요경비', `− ${fmt(ae)}원`);
+  incomeRows += bRow('재료비', `${fmt(mc*12)}원`, 'br-indent');
+  if(mr>0) incomeRows += bRow('임차료', `${fmt(mr*12)}원`, 'br-indent');
+  if(ml>0) incomeRows += bRow('인건비', `${fmt(ml*12)}원`, 'br-indent');
+  if(me>0) incomeRows += bRow('기타경비', `${fmt(me*12)}원`, 'br-indent');
+  incomeRows += bRow('사업소득금액 (매출 − 경비)', `${fmt(as)} − ${fmt(ae)} = ${fmt(netIncome)}원`, 'br-op');
+  incomeRows += bRow('기본공제 (간략 적용)', '− 1,500,000원', 'br-deduct');
+  incomeRows += bRow('과세표준', fmt(taxable)+'원', 'br-op');
+
+  // 해당 세율 구간 표시
+  const brackets = [
+    [14000000,.06,0,'6%'],[50000000,.15,1260000,'15%'],[88000000,.24,5760000,'24%'],
+    [150000000,.35,15440000,'35%'],[300000000,.38,19940000,'38%'],
+    [500000000,.40,25940000,'40%'],[1000000000,.42,35940000,'42%'],[Infinity,.45,65940000,'45%']
+  ];
+  let appliedRate = '6%', appliedDeduct = 0, appliedRateNum = 0.06;
+  for(const [limit,rate,deduct,label] of brackets){
+    if(taxable <= limit){ appliedRate=label; appliedDeduct=deduct; appliedRateNum=rate; break; }
+  }
+  incomeRows += bRow('적용 세율 구간', appliedRate);
+  incomeRows += bRow(`산출세액 (과세표준 × ${appliedRate})`, `${fmt(taxable)} × ${appliedRate} = ${fmt(taxable*appliedRateNum)}원`, 'br-op');
+  if(appliedDeduct > 0){
+    incomeRows += bRow('누진공제액', `− ${fmt(appliedDeduct)}원`, 'br-deduct');
+    incomeRows += bRow(`산출세액 − 누진공제`, `${fmt(taxable*appliedRateNum)} − ${fmt(appliedDeduct)} = ${fmt(incomeTax)}원`, 'br-op');
+  }
+  incomeRows += bRow('최종 종합소득세', fmt(incomeTax)+'원', 'br-result');
+  document.getElementById('basis-income-body').innerHTML = incomeRows;
+
+  // ── 지방소득세 근거 ──
+  document.getElementById('basis-local-total').textContent = fmt(localTax)+'원';
+  document.getElementById('basis-local-body').innerHTML =
+    bRow('종합소득세 기준', fmt(incomeTax)+'원') +
+    bRow('세율', '10%') +
+    bRow(`${fmt(incomeTax)} × 10%`, fmt(localTax)+'원', 'br-result');
+
+  // ── 최종 합산 ──
+  const taxBurdenRate = as > 0 ? (total/as*100).toFixed(2) : 0;
+  const netAfterTax = netIncome - total;
+  document.getElementById('basis-final').innerHTML = `
+    <div class="basis-final-title">연간 납부세금 합계</div>
+    <div class="basis-final-row"><span class="bfl">부가가치세</span><span class="bfv">${fmt(vat)}원</span></div>
+    <div class="basis-final-row"><span class="bfl">종합소득세</span><span class="bfv">${fmt(incomeTax)}원</span></div>
+    <div class="basis-final-row"><span class="bfl">지방소득세</span><span class="bfv">${fmt(localTax)}원</span></div>
+    <div class="basis-final-row"><span class="bfl">월평균 세금 부담</span><span class="bfv">${fmt(total/12)}원/월</span></div>
+    <div class="basis-final-row"><span class="bfl">실질 세부담률 (세금 ÷ 매출)</span><span class="bfv">${taxBurdenRate}%</span></div>
+    <div class="basis-final-row total-row"><span class="bfl">납부세금 합계 (연간)</span><span class="bfv">${fmt(total)}원</span></div>
+  `;
+}
+
+// ===== 현재 세금 계산을 VAN vs PG에 적용 =====
+function applyCurrentTaxToCompare(){
+  // 세금 데이터 최신화
+  updateTax();
+  const d = window._taxData;
+  if(!d || !d.total){
+    alert('먼저 ① 기본정보 탭에서 월별 매출·매입을 입력해 주세요.');
+    switchTab(0);
+    return;
+  }
+
+  // 월 카드매출: monthlyData에서 직접 합산 (hidden 필드 의존 제거)
+  const totalCardSales = monthlyData.reduce((s, m) => s + m.card, 0);
+  const monthlyCardSales = Math.round(totalCardSales / 12);
+
+  if(monthlyCardSales > 0){
+    document.getElementById('cmp-sales').value = monthlyCardSales;
+  }
+
+  // 버튼 피드백
+  const btn = document.getElementById('btn-apply-tax');
+  if(btn){
+    btn.classList.add('applied');
+    const icon = btn.querySelector('.bat-icon');
+    if(icon) icon.style.transform = 'rotate(360deg)';
+    setTimeout(()=>{
+      btn.classList.remove('applied');
+      if(icon) icon.style.transform = '';
+    }, 1200);
+  }
+  updateCompare();
+}
+
+// ===== VAN vs PG (세금 포함 실질 비교) =====
+function updateCompare(){
+  const cs = parseFloat(document.getElementById('cmp-sales').value)||0;
+  const vr = parseFloat(document.getElementById('van-rate').value)/100||0;
+  const pr = parseFloat(document.getElementById('pg-rate').value)/100||0;
+  const af = parseFloat(document.getElementById('acct-fee').value)||0;
+
+  const vanFee   = cs * vr;
+  const pgFee    = cs * pr;
+  const vanTotal = vanFee + af;   // VAN 수수료 + 세무사
+  const diff     = pgFee - vanTotal; // 양수 = PG 더 비쌈, 음수 = PG 더 쌈
+  const annDiff  = diff * 12;
+  const pgWins   = diff < 0;      // PG가 유리한지 여부
+
+  // ── 손익분기점 계산 ──
+  // VAN 총비용 = PG 수수료 → BEP 수수료율 = (VAN수수료 + 세무사) / 카드매출
+  const bepRate = cs > 0 ? (vanTotal / cs * 100) : 0;
+  // PG 현재 수수료와 BEP의 차이
+  const prPct = pr * 100;
+  const bepGap = prPct - bepRate; // 양수 = PG가 BEP보다 비쌈, 음수 = PG가 유리
+
+  // BEP 카드
+  const bepGrid = document.getElementById('bep-grid');
+  if(bepGrid) bepGrid.innerHTML = `
+    <div class="bep-box bep-highlight">
+      <div class="bep-label">손익분기 수수료율</div>
+      <div class="bep-value orange">${bepRate.toFixed(2)}%</div>
+      <div class="bep-sub">이 수수료율 이하면<br>PG가 VAN보다 저렴</div>
+    </div>
+    <div class="bep-box ${pgWins?'bep-highlight':'bep-danger'}">
+      <div class="bep-label">현재 PG 수수료율</div>
+      <div class="bep-value ${pgWins?'green':'red'}">${prPct.toFixed(1)}%</div>
+      <div class="bep-sub">${pgWins
+        ? `BEP보다 ${Math.abs(bepGap).toFixed(2)}%p 낮음<br>✅ PG가 유리`
+        : `BEP보다 ${Math.abs(bepGap).toFixed(2)}%p 높음<br>❌ VAN이 유리`}</div>
+    </div>
+    <div class="bep-box">
+      <div class="bep-label">월 절감액 (PG 기준)</div>
+      <div class="bep-value ${pgWins?'green':'red'}">${pgWins?'+':''}${fmt(Math.abs(diff))}원</div>
+      <div class="bep-sub">${pgWins
+        ? 'PG 선택 시 월 절감'
+        : 'VAN 선택 시 월 절감'}<br>연간 ${fmt(Math.abs(annDiff))}원</div>
+    </div>
+  `;
+
+  // ── saving-box 동적 전환 ──
+  const savingBox  = document.getElementById('saving-box-main');
+  const savingLabel = document.getElementById('saving-main-label');
+  const savingAmt  = document.getElementById('saving-amount');
+  const savingSub  = document.getElementById('saving-sub');
+  if(pgWins){
+    if(savingBox)  savingBox.style.background  = 'linear-gradient(135deg,rgba(0,229,160,.08),rgba(0,229,160,.03))';
+    if(savingBox)  savingBox.style.borderColor = 'rgba(0,229,160,.25)';
+    if(savingLabel) savingLabel.textContent = '✅ PG 방식 선택 시 연간 절감액';
+    if(savingAmt)  { savingAmt.textContent = fmt(Math.abs(annDiff))+'원'; savingAmt.style.color='var(--accent)'; }
+    if(savingSub)  savingSub.textContent = 'VAN 대비 PG가 더 저렴합니다';
+  } else {
+    if(savingBox)  savingBox.style.background  = 'linear-gradient(135deg,rgba(255,107,53,.06),rgba(255,107,53,.02))';
+    if(savingBox)  savingBox.style.borderColor = 'rgba(255,107,53,.25)';
+    if(savingLabel) savingLabel.textContent = '✅ VAN 방식 선택 시 연간 절감액';
+    if(savingAmt)  { savingAmt.textContent = fmt(Math.abs(annDiff))+'원'; savingAmt.style.color='var(--accent2)'; }
+    if(savingSub)  savingSub.textContent = 'PG 대비 VAN이 더 저렴합니다';
+  }
+
+  // ── result-box 동적 전환 ──
+  const vanBox = document.getElementById('van-result-box');
+  const pgBox  = document.getElementById('pg-result-box');
+  const vanLbl = document.getElementById('van-result-label');
+  const pgLbl  = document.getElementById('pg-result-label');
+  const vanAmt = document.getElementById('van-total');
+  const pgAmt  = document.getElementById('pg-total');
+  if(pgWins){
+    if(vanBox){ vanBox.className='result-box red'; }
+    if(pgBox) { pgBox.className='result-box green'; }
+    if(vanLbl) vanLbl.textContent = '❌ VAN + 세무사';
+    if(pgLbl)  pgLbl.textContent  = '✅ PG (세무 포함)';
+    if(vanAmt){ vanAmt.className='result-amount red'; vanAmt.textContent=fmt(vanTotal)+'원/월'; }
+    if(pgAmt) { pgAmt.className='result-amount green'; pgAmt.textContent=fmt(pgFee)+'원/월'; }
+  } else {
+    if(vanBox){ vanBox.className='result-box green'; }
+    if(pgBox) { pgBox.className='result-box red'; }
+    if(vanLbl) vanLbl.textContent = '✅ VAN + 세무사';
+    if(pgLbl)  pgLbl.textContent  = '❌ PG (세무 포함)';
+    if(vanAmt){ vanAmt.className='result-amount green'; vanAmt.textContent=fmt(vanTotal)+'원/월'; }
+    if(pgAmt) { pgAmt.className='result-amount red'; pgAmt.textContent=fmt(pgFee)+'원/월'; }
+  }
+  document.getElementById('van-break').textContent = `VAN ${fmt(vanFee)} + 세무사 ${fmt(af)}`;
+  document.getElementById('pg-break').textContent  = `매출 ${fmt(cs)}×${(pr*100).toFixed(1)}%`;
+
+  // ── 수수료 세부 ──
+  document.getElementById('van-fee-d').textContent = fmt(vanFee)+'원';
+  document.getElementById('acct-d').textContent    = fmt(af)+'원';
+  document.getElementById('van-m').textContent     = fmt(vanTotal)+'원';
+  document.getElementById('van-m').style.color     = pgWins ? 'var(--danger)' : 'var(--accent)';
+  document.getElementById('pg-m').textContent      = fmt(pgFee)+'원';
+  document.getElementById('pg-m').style.color      = pgWins ? 'var(--accent)' : 'var(--danger)';
+
+  const annDiffEl = document.getElementById('ann-diff');
+  if(annDiffEl){
+    annDiffEl.textContent = (pgWins?'PG 절감 ':'VAN 절감 ')+fmt(Math.abs(annDiff))+'원';
+    annDiffEl.style.color = pgWins ? 'var(--accent)' : 'var(--accent2)';
+  }
+
+  // ── 바 차트 ──
+  const mx = Math.max(vanTotal, pgFee, 1);
+  document.getElementById('van-bar').style.width = (vanTotal/mx*100).toFixed(0)+'%';
+  document.getElementById('pg-bar').style.width  = (pgFee/mx*100).toFixed(0)+'%';
+  document.getElementById('van-pct').textContent = fmt(vanTotal)+'원/월';
+  document.getElementById('pg-pct').textContent  = fmt(pgFee)+'원/월';
+  const vanBarLabel = document.getElementById('van-bar-label');
+  const pgBarLabel  = document.getElementById('pg-bar-label');
+  if(vanBarLabel) vanBarLabel.style.color = pgWins ? 'var(--danger)' : 'var(--accent)';
+  if(pgBarLabel)  pgBarLabel.style.color  = pgWins ? 'var(--accent)' : 'var(--danger)';
+
+  // ── info-note ──
+  const infoNote = document.getElementById('compare-info-note');
+  if(infoNote) infoNote.innerHTML = pgWins
+    ? `✅ <strong>PG가 유리합니다:</strong> PG 수수료 ${(pr*100).toFixed(1)}%가 손익분기점 ${bepRate.toFixed(2)}%보다 낮아, 세무사 비용 포함 VAN보다 월 ${fmt(Math.abs(diff))}원 저렴합니다.`
+    : `💡 <strong>VAN이 유리합니다:</strong> PG 수수료 ${(pr*100).toFixed(1)}%가 손익분기점 ${bepRate.toFixed(2)}%보다 높습니다. PG 수수료를 ${bepRate.toFixed(2)}% 이하로 낮추면 PG가 유리해집니다.`;
+
+  // ── 구간 비교표 ──
+  const tbody  = document.getElementById('cmp-tbody');
+  const levels = [2000000,3000000,5000000,8000000,10000000,15000000,20000000];
+  tbody.innerHTML = levels.map(s=>{
+    const vf=s*vr, pf=s*pr, vt=vf+af, md=pf-vt, ad=md*12;
+    const hl = Math.abs(s-cs)<500000;
+    const pgW = md < 0;
+    return `<tr style="${hl?'background:rgba(0,229,160,.05)':''}">
+      <td style="font-family:var(--mono)">${fmt(s)}</td>
+      <td style="font-family:var(--mono);color:var(--muted)">${fmt(vf)}</td>
+      <td style="font-family:var(--mono);color:${pgW?'var(--danger)':'var(--accent)'}">${fmt(vt)}</td>
+      <td style="font-family:var(--mono);color:${pgW?'var(--accent)':'var(--danger)'}">${fmt(pf)}</td>
+      <td style="font-family:var(--mono);color:${pgW?'var(--accent)':'var(--danger)'}">${pgW?'PG↓ ':'VAN↓ '}${fmt(Math.abs(md))}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:${pgW?'var(--accent)':'var(--danger)'}">${pgW?'PG -':'VAN -'}${fmt(Math.abs(ad))}</td>
+    </tr>`;
+  }).join('');
+
+  // ── 세금 반영 상태 배너 ──
+  const d = window._taxData;
+  const hasTax = d && d.total > 0;
+  const statusEl = document.getElementById('cmp-tax-status');
+  const infoEl   = document.getElementById('apply-tax-info');
+  if(statusEl){
+    if(hasTax){
+      statusEl.className = 'cmp-tax-status has-tax';
+      statusEl.innerHTML = `<div class="cts-dot"></div>
+        세금 계산 반영됨 — 연간 납부세금 <strong>${fmt(d.total)}원</strong>
+        (${d.activeSrc==='file'?'파일 업로드':d.activeSrc==='ledger'?'수동 입력':'기본정보'} 기준 · 매출 ${fmt(d.as)}원)`;
+    } else {
+      statusEl.className = 'cmp-tax-status no-tax';
+      statusEl.innerHTML = `<div class="cts-dot"></div>세금 계산 미반영 — "현재 세금 계산 적용" 버튼을 클릭하세요`;
+    }
+  }
+  if(infoEl){
+    infoEl.innerHTML = hasTax
+      ? `세금 반영 완료 · 연간 세금 <strong style="color:var(--accent)">${fmt(d.total)}원</strong> · 조건 변경 후 재클릭하면 재적용됩니다`
+      : `④ 세금 계산 탭의 결과를 이 비교에 반영합니다`;
+  }
+
+  // ── 세금 포함 실질 비교 ──
+  const annVanFee   = vanFee * 12;
+  const annPgFee    = pgFee  * 12;
+  const annAcct     = af * 12;
+  const annTax      = hasTax ? d.total : 0;
+  const vanAnnTotal = annVanFee + annAcct + annTax;
+  const pgAnnTotal  = annPgFee  + annTax;
+  const realAnnDiff = pgAnnTotal - vanAnnTotal;
+  const realPgWins  = realAnnDiff < 0;
+
+  const noteEl = document.getElementById('cmp-tax-source-note');
+  if(noteEl) noteEl.style.display = 'none';
+
+  document.getElementById('cmp-full-grid').innerHTML = `
+    <div class="cmp-col ${realPgWins?'pg-col':'van-col'}">
+      <div class="cmp-col-title">${realPgWins?'✅':'❌'} VAN + 자체신고</div>
+      <div class="cmp-col-row"><span class="cr-l">카드 수수료 (연)</span><span class="cr-v">${fmt(annVanFee)}원</span></div>
+      <div class="cmp-col-row"><span class="cr-l">세무사 기장료 (연)</span><span class="cr-v">${fmt(annAcct)}원</span></div>
+      <div class="cmp-col-row"><span class="cr-l">납부 세금 (연)</span><span class="cr-v">${hasTax?fmt(annTax)+'원':'미반영'}</span></div>
+      <div class="cmp-col-row cr-total"><span class="cr-l">연간 총부담</span><span class="cr-v">${hasTax?fmt(vanAnnTotal)+'원':fmt(annVanFee+annAcct)+'원+'}</span></div>
+    </div>
+    <div class="cmp-col ${realPgWins?'van-col':'pg-col'}">
+      <div class="cmp-col-title">${realPgWins?'❌':'✅'} PG (세무 포함)</div>
+      <div class="cmp-col-row"><span class="cr-l">카드 수수료 (연)</span><span class="cr-v">${fmt(annPgFee)}원</span></div>
+      <div class="cmp-col-row"><span class="cr-l">세무사 별도 비용</span><span class="cr-v">포함됨 (0원)</span></div>
+      <div class="cmp-col-row"><span class="cr-l">납부 세금 (연)</span><span class="cr-v">${hasTax?fmt(annTax)+'원':'미반영'}</span></div>
+      <div class="cmp-col-row cr-total"><span class="cr-l">연간 총부담</span><span class="cr-v">${hasTax?fmt(pgAnnTotal)+'원':fmt(annPgFee)+'원+'}</span></div>
+    </div>
+  `;
+
+  const rows = [
+    ['카드 수수료 (연)', fmt(annVanFee)+'원', fmt(annPgFee)+'원',
+      annPgFee>annVanFee ? `PG가 ${fmt(annPgFee-annVanFee)}원 많음` : `PG가 ${fmt(annVanFee-annPgFee)}원 적음`],
+    ['세무사/신고비용 (연)', fmt(annAcct)+'원', '포함됨 (0원)', `VAN이 ${fmt(annAcct)}원 더 씀`],
+    ['납부 세금 (연)', hasTax?fmt(annTax)+'원':'—', hasTax?fmt(annTax)+'원':'—', '동일'],
+    ['연간 총부담',
+      hasTax?fmt(vanAnnTotal)+'원':fmt(annVanFee+annAcct)+'원+세금',
+      hasTax?fmt(pgAnnTotal)+'원':fmt(annPgFee)+'원+세금',
+      hasTax ? (realPgWins ? `PG가 ${fmt(Math.abs(realAnnDiff))}원 적음` : `VAN이 ${fmt(Math.abs(realAnnDiff))}원 적음`) : '세금 반영 후 확인'],
+  ];
+  document.getElementById('cmp-tax-tbody').innerHTML = rows.map((r,i)=>`
+    <tr style="${i===rows.length-1?'font-weight:700':''}">
+      <td style="color:${i===rows.length-1?'var(--text)':'var(--muted)'}">${r[0]}</td>
+      <td style="font-family:var(--mono);color:${realPgWins?'var(--danger)':'var(--accent)'}">${r[1]}</td>
+      <td style="font-family:var(--mono);color:${realPgWins?'var(--accent)':'var(--danger)'}">${r[2]}</td>
+      <td style="font-family:var(--mono);color:var(--muted)">${r[3]}</td>
+    </tr>`).join('');
+
+  const srcLabel = !hasTax?'':d.activeSrc==='file'?'파일':d.activeSrc==='ledger'?'수동':'기본정보';
+  document.getElementById('real-saving-amount').textContent =
+    hasTax ? fmt(Math.abs(realAnnDiff))+'원' : '현재 사항 적용 버튼을 눌러주세요';
+  document.getElementById('real-saving-sub').textContent = hasTax
+    ? (realPgWins
+        ? `PG 방식이 수수료+세금 합산 연간 ${fmt(Math.abs(realAnnDiff))}원 절감 (${srcLabel} 기준)`
+        : `VAN 방식이 수수료+세금 합산 연간 ${fmt(Math.abs(realAnnDiff))}원 절감 (${srcLabel} 기준)`)
+    : '"현재 세금 계산 적용" 버튼을 클릭하면 세금이 반영됩니다';
+
+  // 실질 절감 박스 색상
+  const realSavingBox = document.querySelector('.saving-box[style*="margin-bottom:0"]');
+  if(realSavingBox && hasTax){
+    realSavingBox.style.background = realPgWins
+      ? 'linear-gradient(135deg,rgba(0,229,160,.08),rgba(0,229,160,.03))'
+      : 'linear-gradient(135deg,rgba(255,107,53,.07),rgba(255,107,53,.02))';
+    realSavingBox.style.borderColor = realPgWins ? 'rgba(0,229,160,.25)' : 'rgba(255,107,53,.25)';
+    document.getElementById('real-saving-amount').style.color = realPgWins ? 'var(--accent)' : 'var(--accent2)';
+  }
+}
+
+function updateAll(){ updateTax(); updateCompare(); }
+
+// ===== 툴팁 =====
+function toggleTip(id){
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ===== 매출 입력 이벤트 =====
+function onSalesInput(){
+  const total=parseFloat(document.getElementById('monthly-sales').value)||0;
+  const card=parseFloat(document.getElementById('card-amount').value)||0;
+  const cashR=parseFloat(document.getElementById('cash-receipt-amount').value)||0;
+  const cashOnly=Math.max(0,total-card-cashR);
+  const qualified=card+cashR;
+  const qualifiedPct=total>0?((qualified/total)*100).toFixed(0):0;
+  const warnEl=document.getElementById('sales-amount-warn');
+  if(card+cashR>total&&total>0){
+    if(warnEl){warnEl.style.display='block';warnEl.textContent=`⚠️ 카드(${fmt(card)})+현금영수증(${fmt(cashR)}) 합계가 총매출(${fmt(total)})을 초과합니다.`;}
+  } else { if(warnEl) warnEl.style.display='none'; }
+  const wrap=document.getElementById('sales-summary');
+  if(wrap) wrap.innerHTML=`
+    <div class="summary-chip"><div class="sc-label">카드결제</div><div class="sc-val sc-blue">${fmt(card)}원</div><div class="sc-sub">${total>0?((card/total)*100).toFixed(0):0}%</div></div>
+    <div class="summary-chip"><div class="sc-label">현금영수증</div><div class="sc-val sc-green">${fmt(cashR)}원</div><div class="sc-sub">${total>0?((cashR/total)*100).toFixed(0):0}%</div></div>
+    <div class="summary-chip"><div class="sc-label">현금(미발급)</div><div class="sc-val sc-muted">${fmt(cashOnly)}원</div><div class="sc-sub">${total>0?((cashOnly/total)*100).toFixed(0):0}%</div></div>
+    <div class="summary-chip"><div class="sc-label">적격증빙 합계</div><div class="sc-val sc-orange">${fmt(qualified)}원</div><div class="sc-sub">전체의 ${qualifiedPct}%</div></div>
+  `;
+  updateAll();
+}
+
+// ===== 매입 입력 이벤트 =====
+function onCostInput(){
+  const total=parseFloat(document.getElementById('monthly-cost').value)||0;
+  const exempt=parseFloat(document.getElementById('exempt-amount').value)||0;
+  const taxable=Math.max(0,total-exempt);
+  const exemptPct=total>0?((exempt/total)*100).toFixed(0):0;
+  const warnEl=document.getElementById('cost-amount-warn');
+  if(exempt>total&&total>0){
+    if(warnEl){warnEl.style.display='block';warnEl.textContent=`⚠️ 면세 재료 금액(${fmt(exempt)})이 재료비 총액(${fmt(total)})을 초과합니다.`;}
+  } else { if(warnEl) warnEl.style.display='none'; }
+  const wrap=document.getElementById('cost-summary');
+  if(wrap) wrap.innerHTML=`
+    <div class="summary-chip"><div class="sc-label">면세 재료</div><div class="sc-val sc-green">${fmt(exempt)}원</div><div class="sc-sub">${exemptPct}% — 의제공제 대상</div></div>
+    <div class="summary-chip"><div class="sc-label">과세 재료</div><div class="sc-val sc-muted">${fmt(taxable)}원</div><div class="sc-sub">${100-parseInt(exemptPct||0)}% — 일반 매입공제</div></div>
+    <div class="summary-chip"><div class="sc-label">의제공제 예상 (연)</div><div class="sc-val sc-orange">${fmt(exempt*12*(8/108))}원</div><div class="sc-sub">8/108 기준 (한도 전)</div></div>
+  `;
+  updateAll();
+}
+
+// ===== 초기화 =====
+window.onload=function(){
+  // 오프라인 환경 감지
+  setTimeout(()=>{
+    if(window._xlsxFailed || typeof XLSX === 'undefined'){
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;bottom:16px;right:16px;background:#1e222d;border:1px solid rgba(255,179,71,.4);border-radius:10px;padding:12px 16px;font-size:12px;color:#ffb347;z-index:9999;max-width:280px;line-height:1.6;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+      banner.innerHTML = '⚠️ <strong>오프라인 모드</strong><br>엑셀(.xlsx) 업로드는 인터넷 연결 시에만 가능합니다.<br>CSV 파일 업로드 및 모든 계산 기능은 정상 작동합니다.<button onclick="this.parentNode.remove()" style="display:block;margin-top:8px;background:rgba(255,179,71,.15);border:1px solid rgba(255,179,71,.3);color:#ffb347;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;width:100%">닫기</button>';
+      document.body.appendChild(banner);
+    }
+  }, 1500);
+
+  // 사업자 기본 설정
+  document.getElementById('tax-type').value    = 'general';   // 일반과세자
+  document.getElementById('emp-count').value   = '2';         // 직원 2명
+
+  // 고정비 설정 — 인건비 480만원
+  document.getElementById('monthly-labor').value     = '4,800,000';
+  document.getElementById('monthly-labor-raw').value = '4800000';
+  document.getElementById('monthly-rent').value      = '800,000';
+  document.getElementById('monthly-rent-raw').value  = '800000';
+  document.getElementById('monthly-etc').value       = '300,000';
+  document.getElementById('monthly-etc-raw').value   = '300000';
+
+  initMonthlyTable();
+
+  // 월별 데이터 — 연 매출 2.5억, 카드 40%, 현금영수증 20%, 재료비=(카드+현금영수증)×50%, 면세=재료비×70%
+  // 1~11월 균등, 12월 잔액 처리
+  const samples = [
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20833000, card:8333000, cashReceipt:4167000, cost:6250000, exempt:4375000},
+    {sales:20837000, card:8335000, cashReceipt:4167000, cost:6251000, exempt:4376000},
+  ];
+
+  samples.forEach((s, i) => {
+    monthlyData[i] = {...s, exemptManual: true};
+    setAccInputs(i, s);
+    refreshAccItem(i);
+    if(i === 0) document.getElementById(`acc-0`).classList.add('open');
+  });
+
+  syncHiddenFields();
+  updateAll();
+
+  // ⑥ VAN vs PG — PG가 유리한 조건으로 기본값 설정
+  // 손익분기: (833만 × 1.5% + 25만) / 833만 = 약 4.5% → PG 3%는 BEP보다 낮아 PG 유리
+  document.getElementById('van-rate').value  = '1.5';   // VAN 수수료 1.5%
+  document.getElementById('pg-rate').value   = '3.0';   // PG 수수료 3.0% (세무 포함)
+  document.getElementById('acct-fee').value  = '250000'; // 세무사 기장료 25만원/월
+  // cmp-sales는 "현재 사항 적용" 버튼 클릭 시 월 카드매출(833만)으로 자동 설정됨
+  document.getElementById('cmp-sales').value = '8333000';
+
+  addRow('income');
+  addRow('expense');
+  document.querySelectorAll('.r-amt')[0].value = '320000';
+  document.querySelectorAll('.r-pay')[1].value = 'invoice';
+  document.querySelectorAll('.r-amt')[1].value = '120000';
+  refreshLedger();
+
+  // ⑥탭도 세금 반영 상태로 초기화 (updateAll이 updateCompare 포함)
+  updateAll();
+};
+</script>
+</body>
+</html>
